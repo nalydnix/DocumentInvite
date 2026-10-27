@@ -31,7 +31,7 @@ function signedIn() {
 
 describe('OutboxPage', () => {
   it('lists emails in the order the API returns them and flags failed deliveries', async () => {
-    mockApi({ ...signedIn(), 'GET /api/outbox?skip=0&take=50': () => jsonResponse(200, { items: [newer, older], total: 2 }) });
+    mockApi({ ...signedIn(), 'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [newer, older], total: 2, page: 1, pageSize: 25 }) });
 
     renderApp(<OutboxPage />);
 
@@ -46,7 +46,7 @@ describe('OutboxPage', () => {
   it('renders the selected email in a sandboxed iframe whose links open in a new tab', async () => {
     mockApi({
       ...signedIn(),
-      'GET /api/outbox?skip=0&take=50': () => jsonResponse(200, { items: [older], total: 1 }),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [older], total: 1, page: 1, pageSize: 25 }),
       'GET /api/outbox/e1': () => jsonResponse(200, detail),
     });
     renderApp(<OutboxPage />);
@@ -64,7 +64,7 @@ describe('OutboxPage', () => {
   it('goes back to the list from the viewer', async () => {
     mockApi({
       ...signedIn(),
-      'GET /api/outbox?skip=0&take=50': () => jsonResponse(200, { items: [older], total: 1 }),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [older], total: 1, page: 1, pageSize: 25 }),
       'GET /api/outbox/e1': () => jsonResponse(200, detail),
     });
     renderApp(<OutboxPage />);
@@ -79,7 +79,7 @@ describe('OutboxPage', () => {
   it('shows the delivery error of the selected email', async () => {
     mockApi({
       ...signedIn(),
-      'GET /api/outbox?skip=0&take=50': () => jsonResponse(200, { items: [newer], total: 1 }),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [newer], total: 1, page: 1, pageSize: 25 }),
       'GET /api/outbox/e2': () => jsonResponse(200, { ...newer, providerMessageId: null, htmlBody: '<p>x</p>', textBody: 'x' }),
     });
     renderApp(<OutboxPage />);
@@ -90,11 +90,56 @@ describe('OutboxPage', () => {
   });
 
   it('shows an empty state', async () => {
-    mockApi({ ...signedIn(), 'GET /api/outbox?skip=0&take=50': () => jsonResponse(200, { items: [], total: 0 }) });
+    mockApi({ ...signedIn(), 'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 25 }) });
 
     renderApp(<OutboxPage />);
 
     expect(await screen.findByText('No emails yet')).toBeInTheDocument();
+  });
+
+  it('pages through the outbox and keeps the page in the URL', async () => {
+    mockApi({
+      ...signedIn(),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [newer], total: 26, page: 1, pageSize: 25 }),
+      'GET /api/outbox?page=2&pageSize=25': () => jsonResponse(200, { items: [older], total: 26, page: 2, pageSize: 25 }),
+    });
+    renderApp(<OutboxPage />);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
+    expect(await screen.findByText('Documents requested for Loan 42')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
+  it('opens on the page named in the URL', async () => {
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/outbox?page=2&pageSize=10': () => jsonResponse(200, { items: [older], total: 11, page: 2, pageSize: 10 }),
+    });
+    renderApp(<OutboxPage />, '/outbox?page=2&pageSize=10');
+
+    expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
+    expect(calls.some((c) => c.key === 'GET /api/outbox?page=2&pageSize=10')).toBe(true);
+  });
+
+  it('shows an error when the list cannot be loaded', async () => {
+    mockApi({ ...signedIn(), 'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(500, { title: 'Boom' }) });
+
+    renderApp(<OutboxPage />);
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows a loading state while the list loads', async () => {
+    mockApi({ ...signedIn(), 'GET /api/outbox?page=1&pageSize=25': () => new Promise<Response>(() => {}) });
+
+    renderApp(<OutboxPage />);
+
+    expect(await screen.findByText('Loading...')).toBeInTheDocument();
   });
 
   it('prefixes the html with a base tag', () => {

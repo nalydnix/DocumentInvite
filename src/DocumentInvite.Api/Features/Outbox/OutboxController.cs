@@ -1,3 +1,5 @@
+using DocumentInvite.Api.Common.Paging;
+using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -13,31 +15,31 @@ public sealed record OutboxEmailDetail(
     Guid Id, string To, string Subject, DateTimeOffset CreatedAt, string Provider, string? ProviderMessageId,
     string? DeliveryError, string HtmlBody, string TextBody);
 
-public sealed record OutboxPage(IReadOnlyList<OutboxEmailSummary> Items, int Total);
-
 // The outbox holds live portal links, so only staff who can act for a party may read it.
 [ApiController]
 [Route("api/outbox")]
 [Authorize(Policy = AuthPolicies.RequireStaff)]
 public class OutboxController(AppDbContext db) : ControllerBase
 {
-    private const int MaxTake = 100;
-
     /// <summary>Emails, newest first.</summary>
     [HttpGet]
-    public async Task<OutboxPage> List(int skip = 0, int take = 50, CancellationToken ct = default)
-    {
-        skip = Math.Max(skip, 0);
-        take = Math.Clamp(take, 1, MaxTake);
-
-        var total = await db.OutboxEmails.CountAsync(ct);
-        var items = await db.OutboxEmails.AsNoTracking()
+    public async Task<PagedResponse<OutboxEmailSummary>> List([FromQuery] PageQuery query, CancellationToken ct) =>
+        await db.OutboxEmails.AsNoTracking()
+            .Select(x => new Row { Id = x.Id, To = x.To, Subject = x.Subject, CreatedAt = x.CreatedAt, Provider = x.Provider, DeliveryError = x.DeliveryError })
             .OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
-            .Skip(skip).Take(take)
-            .Select(x => new OutboxEmailSummary(
-                x.Id, x.To, x.Subject, x.CreatedAt, x.Provider.ToString(), x.DeliveryError))
-            .ToListAsync(ct);
-        return new OutboxPage(items, total);
+            .ToPagedResponseAsync(query,
+                x => new OutboxEmailSummary(x.Id, x.To, x.Subject, x.CreatedAt, x.Provider.ToString(), x.DeliveryError),
+                ct);
+
+    // Only the list columns are read, so the (large) bodies never leave the database.
+    private sealed class Row
+    {
+        public Guid Id { get; init; }
+        public string To { get; init; } = string.Empty;
+        public string Subject { get; init; } = string.Empty;
+        public DateTimeOffset CreatedAt { get; init; }
+        public EmailProvider Provider { get; init; }
+        public string? DeliveryError { get; init; }
     }
 
     [HttpGet("{id:guid}")]

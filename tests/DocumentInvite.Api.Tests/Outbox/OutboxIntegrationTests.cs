@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Outbox;
@@ -166,9 +167,11 @@ public class OutboxIntegrationTests : StaffTestBase
         await Task.Delay(20);
         await SendAsync(Factory, Sample with { Subject = "second" });
 
-        var page = await client.GetFromJsonAsync<OutboxPage>("/api/outbox");
+        var page = await client.GetFromJsonAsync<PagedResponse<OutboxEmailSummary>>("/api/outbox");
 
         page!.Total.Should().Be(2);
+        page.Page.Should().Be(1);
+        page.PageSize.Should().Be(25);
         page.Items.Select(i => i.Subject).Should().Equal("second", "first");
 
         var detail = await client.GetFromJsonAsync<OutboxEmailDetail>($"/api/outbox/{page.Items[0].Id}");
@@ -176,20 +179,84 @@ public class OutboxIntegrationTests : StaffTestBase
         detail.TextBody.Should().Contain("https://app.example.com/p/tok");
     }
 
+    private async Task SeedAsync(int count, bool sameTimestamp = false)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var at = new DateTimeOffset(2027, 3, 1, 10, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < count; i++)
+        {
+            db.OutboxEmails.Add(new OutboxEmail
+            {
+                Id = Guid.NewGuid(),
+                To = "pat@example.com",
+                Subject = $"mail {i}",
+                HtmlBody = "<p>x</p>",
+                TextBody = "x",
+                CreatedAt = sameTimestamp ? at : at.AddMinutes(i),
+                Provider = EmailProvider.Demo,
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private static Task<PagedResponse<OutboxEmailSummary>?> ListAsync(HttpClient client, string query) =>
+        client.GetFromJsonAsync<PagedResponse<OutboxEmailSummary>>($"/api/outbox?{query}");
+
     [Fact]
-    public async Task The_outbox_pages_results()
+    public async Task The_outbox_pages_results_newest_first_with_a_partial_last_page()
     {
         var client = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
-        for (var i = 0; i < 3; i++)
-        {
-            await SendAsync(Factory, Sample with { Subject = $"mail {i}" });
-            await Task.Delay(20);
-        }
+        await SeedAsync(5);
 
-        var page = await client.GetFromJsonAsync<OutboxPage>("/api/outbox?skip=1&take=1");
+        var first = (await ListAsync(client, "page=1&pageSize=2"))!;
+        var last = (await ListAsync(client, "page=3&pageSize=2"))!;
 
-        page!.Total.Should().Be(3);
-        page.Items.Should().ContainSingle().Which.Subject.Should().Be("mail 1");
+        first.Total.Should().Be(5);
+        first.Page.Should().Be(1);
+        first.PageSize.Should().Be(2);
+        first.Items.Select(i => i.Subject).Should().Equal("mail 4", "mail 3");
+        last.Total.Should().Be(5);
+        last.Page.Should().Be(3);
+        last.Items.Should().ContainSingle().Which.Subject.Should().Be("mail 0");
+    }
+
+    [Fact]
+    public async Task A_page_past_the_end_is_empty_with_the_real_total()
+    {
+        var client = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
+        await SeedAsync(3);
+
+        var page = (await ListAsync(client, "page=9&pageSize=2"))!;
+
+        page.Items.Should().BeEmpty();
+        page.Total.Should().Be(3);
+        page.Page.Should().Be(9);
+    }
+
+    [Fact]
+    public async Task Rows_with_the_same_timestamp_still_page_without_overlap()
+    {
+        var client = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
+        await SeedAsync(4, sameTimestamp: true);
+
+        var one = (await ListAsync(client, "page=1&pageSize=2"))!;
+        var two = (await ListAsync(client, "page=2&pageSize=2"))!;
+
+        one.Items.Concat(two.Items).Select(i => i.Id).Distinct().Should().HaveCount(4);
+    }
+
+    [Theory]
+    [InlineData("page=0")]
+    [InlineData("page=-1")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=101")]
+    [InlineData("page=abc")]
+    public async Task The_outbox_rejects_bad_paging(string query)
+    {
+        var client = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
+
+        (await client.GetAsync($"/api/outbox?{query}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
