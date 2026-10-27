@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+TestResults/
+*.log
+publish/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# Local secrets and overrides
+appsettings.*.local.json
+.env
+.env.local
+.env.*.local
+*.pfx
