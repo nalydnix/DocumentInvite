@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DocumentInvite.Api.Common;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Contacts;
@@ -253,20 +254,20 @@ public class ContactsTests : StaffTestBase
         await SeedAsync(client, Valid("Cara", "Zane", "cara@alpha.test"));
         await SeedAsync(client, Valid("Dan", "100%_Real", "dan@gamma.test"));
 
-        var all = (await client.GetFromJsonAsync<ContactPage>("/api/contacts"))!;
+        var all = (await client.GetFromJsonAsync<PagedResponse<ContactResponse>>("/api/contacts"))!;
         all.Total.Should().Be(4);
         all.Items.Select(i => i.LastName).Should().Equal("100%_Real", "Adams", "Lee", "Zane");
 
-        var byEmail = (await client.GetFromJsonAsync<ContactPage>("/api/contacts?search=alpha"))!;
+        var byEmail = (await client.GetFromJsonAsync<PagedResponse<ContactResponse>>("/api/contacts?search=alpha"))!;
         byEmail.Items.Select(i => i.FirstName).Should().BeEquivalentTo("Ann", "Cara");
 
-        var byFullName = (await client.GetFromJsonAsync<ContactPage>("/api/contacts?search=bob%20adams"))!;
+        var byFullName = (await client.GetFromJsonAsync<PagedResponse<ContactResponse>>("/api/contacts?search=bob%20adams"))!;
         byFullName.Items.Should().ContainSingle().Which.Email.Should().Be("bob@beta.test");
 
-        var wildcard = (await client.GetFromJsonAsync<ContactPage>("/api/contacts?search=%25"))!;
+        var wildcard = (await client.GetFromJsonAsync<PagedResponse<ContactResponse>>("/api/contacts?search=%25"))!;
         wildcard.Items.Should().ContainSingle().Which.FirstName.Should().Be("Dan");
 
-        var page2 = (await client.GetFromJsonAsync<ContactPage>("/api/contacts?page=2&pageSize=3"))!;
+        var page2 = (await client.GetFromJsonAsync<PagedResponse<ContactResponse>>("/api/contacts?page=2&pageSize=3"))!;
         page2.Total.Should().Be(4);
         page2.Items.Should().ContainSingle().Which.LastName.Should().Be("Zane");
         page2.Page.Should().Be(2);

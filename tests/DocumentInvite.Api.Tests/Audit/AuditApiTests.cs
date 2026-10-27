@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Settings;
@@ -95,8 +96,8 @@ public class AuditApiTests : StaffTestBase
             await admin.PostAsync("/api/audit/verify", null);
         }
 
-        var page1 = await admin.GetFromJsonAsync<AuditPage>("/api/audit?pageSize=2&page=1");
-        var page2 = await admin.GetFromJsonAsync<AuditPage>("/api/audit?pageSize=2&page=2");
+        var page1 = await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>("/api/audit?pageSize=2&page=1");
+        var page2 = await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>("/api/audit?pageSize=2&page=2");
 
         page1!.Total.Should().BeGreaterThanOrEqualTo(4);
         page1.Items.Should().HaveCount(2);
@@ -114,19 +115,19 @@ public class AuditApiTests : StaffTestBase
             .Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var contactId = contact.GetProperty("id").GetGuid();
 
-        var byAction = await admin.GetFromJsonAsync<AuditPage>("/api/audit?action=audit.");
+        var byAction = await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>("/api/audit?action=audit.");
         byAction!.Items.Should().NotBeEmpty().And.OnlyContain(x => x.Action.StartsWith("audit."));
 
-        var byTarget = await admin.GetFromJsonAsync<AuditPage>($"/api/audit?targetType=contact&targetId={contactId}");
+        var byTarget = await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>($"/api/audit?targetType=contact&targetId={contactId}");
         byTarget!.Items.Should().ContainSingle().Which.Action.Should().Be("contact.created");
 
         var actorId = byTarget.Items[0].ActorId;
-        var byActor = await admin.GetFromJsonAsync<AuditPage>($"/api/audit?actorId={actorId}&action=contact");
+        var byActor = await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>($"/api/audit?actorId={actorId}&action=contact");
         byActor!.Items.Should().ContainSingle();
 
         var future = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"));
-        (await admin.GetFromJsonAsync<AuditPage>($"/api/audit?from={future}"))!.Items.Should().BeEmpty();
-        (await admin.GetFromJsonAsync<AuditPage>($"/api/audit?to={future}"))!.Items.Should().NotBeEmpty();
+        (await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>($"/api/audit?from={future}"))!.Items.Should().BeEmpty();
+        (await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>($"/api/audit?to={future}"))!.Items.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -134,7 +135,7 @@ public class AuditApiTests : StaffTestBase
     {
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
 
-        var page = await admin.GetFromJsonAsync<AuditPage>("/api/audit?action=%25");
+        var page = await admin.GetFromJsonAsync<PagedResponse<AuditEventResponse>>("/api/audit?action=%25");
 
         page!.Items.Should().BeEmpty();
     }

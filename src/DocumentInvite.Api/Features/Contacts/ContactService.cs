@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Infrastructure.Persistence;
@@ -15,7 +16,7 @@ public sealed record ContactResult(ContactResponse? Contact, bool NotFound, stri
 
 public sealed class ContactService(AppDbContext db, IAuditLog audit, TimeProvider clock)
 {
-    public async Task<ContactPage> ListAsync(ContactListQuery query, CancellationToken ct)
+    public async Task<PagedResponse<ContactResponse>> ListAsync(ContactListQuery query, CancellationToken ct)
     {
         var contacts = db.Contacts.AsNoTracking();
 
@@ -32,14 +33,9 @@ public sealed class ContactService(AppDbContext db, IAuditLog audit, TimeProvide
             }
         }
 
-        var total = await contacts.CountAsync(ct);
-        var items = await contacts
+        return await contacts
             .OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ThenBy(c => c.Id)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToListAsync(ct);
-
-        return new ContactPage(items.Select(ToResponse).ToList(), total, query.Page, query.PageSize);
+            .ToPagedResponseAsync(query, ToResponse, ct);
     }
 
     public async Task<ContactResult> GetAsync(Guid id, CancellationToken ct)

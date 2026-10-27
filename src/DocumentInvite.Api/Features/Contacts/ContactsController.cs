@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,7 @@ public class ContactsController(ContactService service) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = AuthPolicies.CanRead)]
-    public async Task<ContactPage> List([FromQuery] ContactListQuery query, CancellationToken ct) =>
+    public async Task<PagedResponse<ContactResponse>> List([FromQuery] ContactListQuery query, CancellationToken ct) =>
         await service.ListAsync(query, ct);
 
     [HttpGet("{id:guid}")]
