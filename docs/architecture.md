@@ -29,7 +29,7 @@ This is a portfolio-grade MVP. The priorities are code quality, security, privac
 | Email | An `IEmailSender` abstraction with two implementations: `DemoOutboxEmailSender` (the default, stored in the database and viewable in the UI) and `ResendEmailSender` (selected through configuration) |
 | Web | React with TypeScript and Vite, React Router, Tailwind CSS, and TanStack Query for server state. The UI is mobile-first and visually similar to FileInvite: a clean white and blue look, card-based checklists and progress bars. |
 | Tests | xUnit, FluentAssertions, and `WebApplicationFactory` integration tests against SQL Server (Testcontainers, or the CI service container); Vitest and React Testing Library for the web app; Playwright for a few end-to-end smoke tests |
-| CI/CD | GitHub Actions: build and test on each PR, deploy the API to Azure App Service, deploy the web app to Vercel, and an hourly reminders cron |
+| CI/CD | GitHub Actions: build and test on each PR, deploy the API to Azure App Service, and an hourly reminders cron; the web app deploys through Vercel's Git integration |
 
 ## 3. Repository layout
 
@@ -49,7 +49,7 @@ This is a portfolio-grade MVP. The priorities are code quality, security, privac
 │  ├─ DocumentInvite.Api.Tests/      # unit and integration tests
 │  └─ DocumentInvite.Web.e2e/        # Playwright smoke tests (optional)
 ├─ docs/architecture.md
-├─ .github/workflows/                # ci.yml, deploy-api.yml, deploy-web.yml, reminders-cron.yml
+├─ .github/workflows/                # ci.yml, deploy-api.yml, reminders-cron.yml
 └─ docker-compose.yml                # SQL Server + Azurite for local development
 ```
 
@@ -162,7 +162,7 @@ All routes are under `/api` unless noted. Staff routes need a bearer token, and 
 - **API**: Azure App Service (Linux, .NET 10), deployed by GitHub Actions on pushes to `main`. EF migrations are applied by a deploy step using the privileged connection string. The app runs as a least-privilege SQL user.
 - **Database**: Azure SQL Database (free offer).
 - **Storage**: an Azure Storage account with a private container, and CORS allowing `PUT` from the web origin for SAS uploads.
-- **Web**: Vercel, with `VITE_API_BASE_URL` pointing at the API and SPA rewrites to `index.html`.
+- **Web**: Vercel via its Git integration (no deploy workflow), with `VITE_API_BASE_URL` pointing at the API and SPA rewrites to `index.html`.
 - **Cron**: `.github/workflows/reminders-cron.yml` runs hourly and calls `POST /internal/jobs/reminders` with `X-Api-Key` from repository secrets.
 - **Configuration**: `ConnectionStrings__Default`, `ConnectionStrings__Migrations`, `Blob__ConnectionString`, `Jwt`/Identity settings, `Email__Provider`, `Resend__ApiKey`, `Jobs__ApiKey`, `Demo__Enabled`, `Cors__Origins`, `Portal__BaseUrl`.
 - **Local**: `docker compose up` (SQL Server and Azurite), then `dotnet run` and `npm run dev`. The ports can be configured (`--urls` / `ASPNETCORE_URLS` for the API, `--port` / `VITE_PORT` for the web app), so several test instances can run side by side.
