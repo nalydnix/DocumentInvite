@@ -19,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AppSettings> Settings => Set<AppSettings>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<OutboxEmail> OutboxEmails => Set<OutboxEmail>();
     public DbSet<Contact> Contacts => Set<Contact>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -73,6 +74,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Hash).HasColumnType("binary(32)");
             // A second event can never claim the same predecessor, so the chain cannot fork.
             e.HasIndex(x => x.PrevHash).IsUnique();
+        });
+
+        modelBuilder.Entity<OutboxEmail>(e =>
+        {
+            e.ToTable("OutboxEmails");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.To).HasMaxLength(320).IsRequired();
+            e.Property(x => x.Subject).HasMaxLength(500).IsRequired();
+            e.Property(x => x.HtmlBody).HasColumnType("nvarchar(max)");
+            e.Property(x => x.TextBody).HasColumnType("nvarchar(max)");
+            e.Property(x => x.Provider).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ProviderMessageId).HasMaxLength(200);
+            e.Property(x => x.DeliveryError).HasMaxLength(500);
+            e.HasIndex(x => new { x.CreatedAt, x.Id });
         });
     }
 }
