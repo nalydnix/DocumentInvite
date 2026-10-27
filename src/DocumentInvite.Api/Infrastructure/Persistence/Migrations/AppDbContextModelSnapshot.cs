@@ -466,6 +466,41 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("Loans", (string)null);
                 });
 
+            modelBuilder.Entity("DocumentInvite.Api.Domain.Message", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("AuthorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("InviteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsInternal")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InviteId", "CreatedAt");
+
+                    b.ToTable("Messages", (string)null);
+                });
+
             modelBuilder.Entity("DocumentInvite.Api.Domain.OutboxEmail", b =>
                 {
                     b.Property<Guid>("Id")
@@ -837,6 +872,15 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.HasOne("DocumentInvite.Api.Domain.Loan", null)
                         .WithMany("Invites")
                         .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DocumentInvite.Api.Domain.Message", b =>
+                {
+                    b.HasOne("DocumentInvite.Api.Domain.Invite", null)
+                        .WithMany()
+                        .HasForeignKey("InviteId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

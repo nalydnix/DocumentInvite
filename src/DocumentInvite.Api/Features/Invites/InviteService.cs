@@ -35,7 +35,8 @@ public sealed class InviteService(
         }
 
         var contact = await db.Contacts.AsNoTracking().SingleAsync(c => c.Id == invite.ContactId, ct);
-        return InviteResult<InviteResponse>.Ok(ToResponse(invite, contact));
+        var files = await LoadFilesAsync(db, invite.Items.Select(i => i.Id).ToList(), ct);
+        return InviteResult<InviteResponse>.Ok(ToResponse(invite, contact, files));
     }
 
     /// <summary>Creates one invite per party, emails each party its link, and updates the loan status.</summary>
@@ -249,12 +250,28 @@ public sealed class InviteService(
     private static Task<Loan?> LoadLoanAsync(IQueryable<Loan> query, CancellationToken ct) =>
         query.Include(l => l.Invites).ThenInclude(i => i.Items).AsSplitQuery().SingleOrDefaultAsync(ct);
 
-    internal static InviteResponse ToResponse(Invite invite, Contact contact) => new(
+    /// <summary>Loads the ready files of the given items, grouped by item id, for staff views.</summary>
+    internal static async Task<ILookup<Guid, StoredFile>> LoadFilesAsync(
+        AppDbContext db, IReadOnlyCollection<Guid> itemIds, CancellationToken ct) =>
+        (await db.StoredFiles.AsNoTracking()
+            .Where(f => itemIds.Contains(f.RequestItemId) && f.Status == StoredFileStatus.Ready)
+            .ToListAsync(ct)).ToLookup(f => f.RequestItemId);
+
+    internal static InviteResponse ToResponse(
+        Invite invite, Contact contact, ILookup<Guid, StoredFile>? files = null) => new(
         invite.Id, invite.LoanId, invite.ContactId,
         $"{contact.FirstName} {contact.LastName}", contact.Email, contact.PartyType,
         invite.DueDate, invite.ReminderIntervalDays, invite.SentAt, invite.TokenExpiresAt, invite.RevokedAt,
         invite.Status,
         invite.Items.OrderBy(i => i.SortOrder).Select(i => new InviteItemResponse(
-            i.Id, i.Name, i.Kind, i.Instructions, i.AllowMultiple, i.FieldType, i.IsRequired, i.SortOrder, i.Status))
+            i.Id, i.Name, i.Kind, i.Instructions, i.AllowMultiple, i.FieldType, i.IsRequired, i.SortOrder, i.Status,
+            i.RejectionReason, i.FieldValue, i.PartyNote, i.ReviewedAt,
+            (files?[i.Id] ?? Enumerable.Empty<StoredFile>())
+                .Where(f => f.Status == StoredFileStatus.Ready)
+                .OrderBy(f => f.Sequence).ThenBy(f => f.Id)
+                .Select(f => new ItemFileResponse(
+                    f.Id, f.StoredFileName ?? f.OriginalFileName, f.OriginalFileName, f.ContentType, f.SizeBytes,
+                    f.Sequence ?? 0, f.UploadedAt))
+                .ToList()))
             .ToList());
 }
