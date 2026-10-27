@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,7 @@ namespace DocumentInvite.Api.Features.Audit;
 public class AuditController(AuditQueryService service) : ControllerBase
 {
     [HttpGet]
-    public async Task<AuditPage> List([FromQuery] AuditQuery query, CancellationToken ct) =>
+    public async Task<PagedResponse<AuditEventResponse>> List([FromQuery] AuditQuery query, CancellationToken ct) =>
         await service.ListAsync(query, ct);
 
     [HttpGet("export.csv")]

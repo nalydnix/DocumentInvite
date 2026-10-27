@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -15,17 +16,12 @@ public sealed class AuditQueryService(AppDbContext db, IAuditLog audit, IAuditVe
         "ipAddress", "userAgent", "correlationId", "details",
     ];
 
-    public async Task<AuditPage> ListAsync(AuditQuery query, CancellationToken ct)
+    public async Task<PagedResponse<AuditEventResponse>> ListAsync(AuditQuery query, CancellationToken ct)
     {
         var filtered = Filter(db.AuditEvents.AsNoTracking(), query);
-        var total = await filtered.CountAsync(ct);
-        var items = await filtered
+        return await filtered
             .OrderByDescending(x => x.Id)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToListAsync(ct);
-
-        return new AuditPage(items.Select(ToResponse).ToList(), total, query.Page, query.PageSize);
+            .ToPagedResponseAsync(query, ToResponse, ct);
     }
 
     /// <summary>

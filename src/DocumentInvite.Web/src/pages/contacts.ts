@@ -1,3 +1,5 @@
+import type { PagedResponse } from '../lib/paging';
+
 export const PARTY_TYPES = ['Borrower', 'CoBorrower', 'Guarantor', 'Broker', 'Attorney', 'Accountant'] as const;
 export type PartyType = (typeof PARTY_TYPES)[number];
 
@@ -24,14 +26,7 @@ export interface Contact {
   isPseudonymised: boolean;
 }
 
-export interface ContactPage {
-  items: Contact[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-export const CONTACTS_PAGE_SIZE = 20;
+export type ContactPage = PagedResponse<Contact>;
 
 /** Roles that may create and edit contacts (the viewer role is read-only). */
 export const CONTACT_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;
