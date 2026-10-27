@@ -18,8 +18,16 @@ public sealed class ResendClient(HttpClient http)
             throw new ResendException((int)response.StatusCode);
         }
 
-        var body = await response.Content.ReadFromJsonAsync<ResendResponse>(cancellationToken);
-        return body?.Id;
+        // The email was accepted; an unreadable body only means there is no message id to keep.
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<ResendResponse>(cancellationToken);
+            return body?.Id;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     private sealed record ResendRequest(

@@ -100,6 +100,22 @@ public class OutboxIntegrationTests(SqlServerFixture sql) : StaffTestBase(sql)
         json.RootElement.GetProperty("text").GetString().Should().Contain("https://app.example.com/p/tok");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("not json")]
+    public async Task An_unreadable_success_body_still_counts_as_delivered(string body)
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        using var factory = ResendFactory(handler);
+
+        var result = await SendAsync(factory, Sample);
+
+        result.Delivered.Should().BeTrue();
+        var stored = (await StoredAsync()).Should().ContainSingle().Subject;
+        stored.ProviderMessageId.Should().BeNull();
+        stored.DeliveryError.Should().BeNull();
+    }
+
     [Fact]
     public async Task A_resend_failure_is_returned_and_the_stored_copy_is_kept()
     {
