@@ -97,6 +97,13 @@ public sealed class ReviewService(
 
         var token = PortalTokens.Generate();
         invite.TokenHash = PortalTokens.Hash(token);
+        // An expired link would make the emailed link useless, so extend it as a reissue does.
+        var expiry = InviteService.DefaultExpiry(invite.DueDate);
+        var newExpiry = expiry > now ? expiry : now.AddDays(InviteService.LinkValidDaysAfterDueDate);
+        if (invite.TokenExpiresAt < newExpiry)
+        {
+            invite.TokenExpiresAt = newExpiry;
+        }
 
         db.Messages.Add(new Message
         {

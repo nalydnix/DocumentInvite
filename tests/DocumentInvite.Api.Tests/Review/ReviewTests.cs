@@ -56,7 +56,7 @@ public class ReviewTests : StaffTestBase
 
     private async Task<Seeded> SeedAsync(
         RequestItemStatus fileStatus = RequestItemStatus.Submitted, string reference = "LN-7",
-        DateOnly? due = null, bool revoked = false)
+        DateOnly? due = null, bool revoked = false, DateTimeOffset? tokenExpiresAt = null)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -77,7 +77,7 @@ public class ReviewTests : StaffTestBase
             LoanId = loan.Id,
             ContactId = contact.Id,
             TokenHash = hash,
-            TokenExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
+            TokenExpiresAt = tokenExpiresAt ?? DateTimeOffset.UtcNow.AddDays(30),
             DueDate = due ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
             SentAt = DateTimeOffset.UtcNow,
             RevokedAt = revoked ? DateTimeOffset.UtcNow : null,
@@ -200,6 +200,24 @@ public class ReviewTests : StaffTestBase
         var audit = (await AuditEventsAsync()).Single(e => e.Action == "item.rejected");
         audit.TargetId.Should().Be(seed.FileItemId);
         audit.DetailsJson.Should().NotContain("blurry");
+    }
+
+    [Fact]
+    public async Task Reject_extends_an_expired_link_so_the_emailed_link_works()
+    {
+        var seed = await SeedAsync(
+            due: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-60)), tokenExpiresAt: DateTimeOffset.UtcNow.AddDays(-5));
+        var officer = await OfficerAsync();
+
+        var response = await officer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Blurry"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var email = await DbAsync(db => db.OutboxEmails.AsNoTracking().SingleAsync());
+        var token = System.Text.RegularExpressions.Regex.Match(email.TextBody, "/p/([A-Za-z0-9_-]+)").Groups[1].Value;
+        using var scope = Factory.Services.CreateScope();
+        var lookup = await scope.ServiceProvider.GetRequiredService<InviteTokenService>().ResolveAsync(token);
+        lookup.Failure.Should().BeNull();
+        lookup.Invite.Should().NotBeNull();
     }
 
     [Fact]
