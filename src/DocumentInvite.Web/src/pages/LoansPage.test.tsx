@@ -177,7 +177,7 @@ describe('LoanFormPage', () => {
       'POST /api/loans': () => jsonResponse(201, { ...loan, invites: [] }),
       'GET /api/loans/l1': () => jsonResponse(200, { ...loan, invites: [] }),
       'GET /api/contacts?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
-      'GET /api/templates': () => jsonResponse(200, []),
+      'GET /api/templates?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
     });
     renderRoutes('/loans/new');
     const user = userEvent.setup();
@@ -249,7 +249,7 @@ describe('LoanDetailPage', () => {
       ...signedIn(roles),
       'GET /api/loans/l1': () => jsonResponse(200, current),
       'GET /api/contacts?page=1&pageSize=100': () => jsonResponse(200, contacts),
-      'GET /api/templates': () => jsonResponse(200, templates),
+      'GET /api/templates?page=1&pageSize=100': () => jsonResponse(200, { items: templates, total: 1, page: 1, pageSize: 100 }),
       'GET /api/templates/t1': () => jsonResponse(200, templateDetail),
     };
   }

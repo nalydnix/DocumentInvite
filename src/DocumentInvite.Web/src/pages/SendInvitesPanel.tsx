@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
+import type { PagedResponse } from '../lib/paging';
 import type { ContactPage } from './contacts';
 import type { FieldType, Invite, ItemKind } from './loans';
 
@@ -64,7 +65,8 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
   });
   const templates = useQuery({
     queryKey: ['templates', 'active'],
-    queryFn: () => apiFetch<TemplateSummary[]>('/api/templates'),
+    // A bounded lookup: the first 100 active templates, by name.
+    queryFn: () => apiFetch<PagedResponse<TemplateSummary>>('/api/templates?page=1&pageSize=100'),
   });
 
   const send = useMutation({
@@ -188,7 +190,7 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
                   onChange={(e) => void applyTemplate(party.key, e.target.value)}
                 >
                   <option value="">Choose a template...</option>
-                  {(templates.data ?? [])
+                  {(templates.data?.items ?? [])
                     .filter((t) => !t.isArchived)
                     .map((template) => (
                       <option key={template.id} value={template.id}>
