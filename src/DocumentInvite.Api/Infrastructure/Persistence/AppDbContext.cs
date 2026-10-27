@@ -27,6 +27,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Invite> Invites => Set<Invite>();
     public DbSet<RequestItem> RequestItems => Set<RequestItem>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -140,6 +141,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Result).HasMaxLength(2000).IsRequired();
             // One run per job and window: a second call for the same window cannot start another.
             e.HasIndex(x => new { x.JobName, x.WindowKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<StoredFile>(e =>
+        {
+            e.ToTable("StoredFiles");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.BlobName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.StoredFileName).HasMaxLength(255);
+            e.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+            e.Property(x => x.Sha256).HasColumnType("binary(32)");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.BlobName).IsUnique();
+            // Two files of one item can never share a sequence number, even under concurrent completion.
+            e.HasIndex(x => new { x.RequestItemId, x.Sequence }).IsUnique().HasFilter("[Sequence] IS NOT NULL");
+            e.HasOne<RequestItem>().WithMany().HasForeignKey(x => x.RequestItemId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditEvent>(e =>
