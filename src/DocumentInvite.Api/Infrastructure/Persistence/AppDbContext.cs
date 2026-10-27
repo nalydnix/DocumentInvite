@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Loan> Loans => Set<Loan>();
     public DbSet<Invite> Invites => Set<Invite>();
     public DbSet<RequestItem> RequestItems => Set<RequestItem>();
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -128,6 +129,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.PartyNote).HasMaxLength(2000);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasIndex(x => new { x.InviteId, x.SortOrder });
+        });
+
+        modelBuilder.Entity<JobRun>(e =>
+        {
+            e.ToTable("JobRuns");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.JobName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.WindowKey).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Result).HasMaxLength(2000).IsRequired();
+            // One run per job and window: a second call for the same window cannot start another.
+            e.HasIndex(x => new { x.JobName, x.WindowKey }).IsUnique();
         });
 
         modelBuilder.Entity<AuditEvent>(e =>
