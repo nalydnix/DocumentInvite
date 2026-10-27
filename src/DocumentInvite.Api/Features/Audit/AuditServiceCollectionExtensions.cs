@@ -9,6 +9,7 @@ public static class AuditServiceCollectionExtensions
         services.AddSingleton<AuditImmutabilityInterceptor>();
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IAuditVerifier, AuditVerifier>();
+        services.AddScoped<AuditQueryService>();
         return services;
     }
 }

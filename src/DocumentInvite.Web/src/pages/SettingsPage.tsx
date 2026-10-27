@@ -1,0 +1,88 @@
+import { useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Card } from '../components/Card';
+import { ErrorList, Field, primaryButtonClass } from '../components/Field';
+import { ApiError, apiFetch } from '../lib/api';
+
+interface Settings {
+  defaultReminderIntervalDays: number;
+  retentionDaysAfterCompletion: number;
+}
+
+function messagesOf(error: unknown): string[] {
+  return error instanceof ApiError ? error.messages : error ? ['Something went wrong. Please try again.'] : [];
+}
+
+function SettingsForm({ settings }: { settings: Settings }) {
+  const queryClient = useQueryClient();
+  const [reminder, setReminder] = useState(String(settings.defaultReminderIntervalDays));
+  const [retention, setRetention] = useState(String(settings.retentionDaysAfterCompletion));
+
+  const save = useMutation({
+    mutationFn: () =>
+      apiFetch<Settings>('/api/settings', {
+        method: 'PUT',
+        body: {
+          defaultReminderIntervalDays: Number(reminder),
+          retentionDaysAfterCompletion: Number(retention),
+        },
+      }),
+    onSuccess: (saved) => queryClient.setQueryData(['settings'], saved),
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    save.mutate();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-2 grid gap-3 sm:grid-cols-2">
+      <Field
+        label="Default reminder interval (days)"
+        type="number"
+        min={1}
+        max={90}
+        required
+        value={reminder}
+        onChange={(e) => setReminder(e.target.value)}
+      />
+      <Field
+        label="Retention after completion (days)"
+        type="number"
+        min={30}
+        max={3650}
+        required
+        value={retention}
+        onChange={(e) => setRetention(e.target.value)}
+      />
+      <div className="space-y-3 sm:col-span-2">
+        <ErrorList messages={messagesOf(save.error)} />
+        {save.isSuccess && (
+          <p role="status" className="text-sm text-green-700">
+            Settings saved.
+          </p>
+        )}
+        <button type="submit" disabled={save.isPending} className={primaryButtonClass}>
+          Save settings
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function SettingsPage() {
+  const settings = useQuery({ queryKey: ['settings'], queryFn: () => apiFetch<Settings>('/api/settings') });
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-ink">Settings</h1>
+      {settings.isPending && <p className="text-sm text-ink-muted">Loading settings...</p>}
+      {settings.isError && <ErrorList messages={messagesOf(settings.error)} />}
+      {settings.data && (
+        <Card title="Reminders and retention">
+          <SettingsForm settings={settings.data} />
+        </Card>
+      )}
+    </div>
+  );
+}
