@@ -37,7 +37,7 @@ public abstract class IntegrationTestBase(SqlServerFixture sql) : IAsyncLifetime
     protected WebApplicationFactory<Program> WithEnvironment(string environment) =>
         Factory.WithWebHostBuilder(builder => builder.UseEnvironment(environment));
 
-    public async Task DisposeAsync()
+    public virtual async Task DisposeAsync()
     {
         if (_factory is not null)
         {
