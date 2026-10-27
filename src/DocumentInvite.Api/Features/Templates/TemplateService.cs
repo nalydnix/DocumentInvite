@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Infrastructure.Persistence;
@@ -15,19 +16,38 @@ public sealed record TemplateResult(TemplateResponse? Template, bool NotFound, s
 
 public sealed class TemplateService(AppDbContext db, IAuditLog audit, TimeProvider clock)
 {
-    public async Task<IReadOnlyList<TemplateSummaryResponse>> ListAsync(bool includeArchived, CancellationToken ct)
+    public async Task<PagedResponse<TemplateSummaryResponse>> ListAsync(TemplateListQuery query, CancellationToken ct)
     {
-        var query = db.Templates.AsNoTracking();
-        if (!includeArchived)
+        var templates = db.Templates.AsNoTracking();
+        if (!query.IncludeArchived)
         {
-            query = query.Where(x => x.ArchivedAt == null);
+            templates = templates.Where(x => x.ArchivedAt == null);
         }
 
-        return await query
-            .OrderBy(x => x.Name)
-            .Select(x => new TemplateSummaryResponse(
-                x.Id, x.Name, x.Description, x.IsSeeded, x.ArchivedAt != null, x.Items.Count))
-            .ToListAsync(ct);
+        return await templates
+            .Select(x => new Row
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Description = x.Description,
+                IsSeeded = x.IsSeeded,
+                IsArchived = x.ArchivedAt != null,
+                ItemCount = x.Items.Count,
+            })
+            .OrderBy(x => x.Name).ThenBy(x => x.Id)
+            .ToPagedResponseAsync(
+                query, x => new TemplateSummaryResponse(x.Id, x.Name, x.Description, x.IsSeeded, x.IsArchived, x.ItemCount), ct);
+    }
+
+    // A projection EF can order by (a constructor call cannot be translated inside OrderBy).
+    private sealed class Row
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public string Description { get; init; } = string.Empty;
+        public bool IsSeeded { get; init; }
+        public bool IsArchived { get; init; }
+        public int ItemCount { get; init; }
     }
 
     public async Task<TemplateResult> GetAsync(Guid id, CancellationToken ct)

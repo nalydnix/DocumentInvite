@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Common.Errors;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,8 +12,8 @@ public class TemplatesController(TemplateService service) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = AuthPolicies.CanRead)]
-    public async Task<IReadOnlyList<TemplateSummaryResponse>> List(
-        [FromQuery] bool includeArchived, CancellationToken ct) => await service.ListAsync(includeArchived, ct);
+    public async Task<PagedResponse<TemplateSummaryResponse>> List(
+        [FromQuery] TemplateListQuery query, CancellationToken ct) => await service.ListAsync(query, ct);
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = AuthPolicies.CanRead)]

@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using FluentValidation;
 
@@ -5,6 +6,17 @@ namespace DocumentInvite.Api.Features.Templates;
 
 public sealed record TemplateSummaryResponse(
     Guid Id, string Name, string Description, bool IsSeeded, bool IsArchived, int ItemCount);
+
+/// <summary>Query-string parameters for the template list.</summary>
+public sealed record TemplateListQuery(
+    bool IncludeArchived = false,
+    int Page = PagingDefaults.DefaultPage,
+    int PageSize = PagingDefaults.DefaultPageSize) : IPagedQuery;
+
+public sealed class TemplateListQueryValidator : AbstractValidator<TemplateListQuery>
+{
+    public TemplateListQueryValidator() => Include(new PagedQueryValidator<TemplateListQuery>());
+}
 
 public sealed record TemplateItemResponse(
     Guid Id,
