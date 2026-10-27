@@ -7,6 +7,9 @@ import { AuditPage } from './pages/AuditPage';
 import { ContactFormPage } from './pages/ContactFormPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { HomePage } from './pages/HomePage';
+import { LoanDetailPage } from './pages/LoanDetailPage';
+import { LoanFormPage } from './pages/LoanFormPage';
+import { LoansPage } from './pages/LoansPage';
 import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
@@ -34,6 +37,9 @@ export default function App() {
                   <Route path="templates" element={<TemplatesPage />} />
                   <Route path="templates/new" element={<TemplateEditorPage />} />
                   <Route path="templates/:id" element={<TemplateEditorPage />} />
+                  <Route path="loans" element={<LoansPage />} />
+                  <Route path="loans/new" element={<LoanFormPage />} />
+                  <Route path="loans/:id" element={<LoanDetailPage />} />
                   <Route path="contacts" element={<ContactsPage />} />
                   <Route path="contacts/new" element={<ContactFormPage />} />
                   <Route path="contacts/:id" element={<ContactFormPage />} />

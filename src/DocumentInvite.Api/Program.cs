@@ -1,5 +1,7 @@
 using DocumentInvite.Api.Common;
 using DocumentInvite.Api.Features.Auth;
+using DocumentInvite.Api.Features.Invites;
+using DocumentInvite.Api.Features.Loans;
 using DocumentInvite.Api.Features.Templates;
 using DocumentInvite.Api.Features.Outbox;
 using Scalar.AspNetCore;
@@ -9,6 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddPlatform();
 builder.Services.AddStaffAuth();
 builder.Services.AddTemplates();
+builder.Services.AddLoans();
+builder.Services.AddInvites();
 builder.Services.AddEmail();
 builder.Services.AddOpenApi();
 
