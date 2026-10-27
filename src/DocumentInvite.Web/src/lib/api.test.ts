@@ -1,7 +1,19 @@
-import { ApiError, apiFetch, hasStoredSession, signIn } from './api';
+import { ApiError, apiFetch, hasStoredSession, resolveApiBaseUrl, signIn } from './api';
 import { jsonResponse, mockApi, resetSession, tokens } from '../test-utils';
 
 afterEach(resetSession);
+
+describe('resolveApiBaseUrl', () => {
+  it('is always same-origin in development, even when a base URL is configured', () => {
+    expect(resolveApiBaseUrl(true, 'http://localhost:5301')).toBe('');
+    expect(resolveApiBaseUrl(true, undefined)).toBe('');
+  });
+
+  it('uses the configured API origin in production', () => {
+    expect(resolveApiBaseUrl(false, 'https://api.example.com')).toBe('https://api.example.com');
+    expect(resolveApiBaseUrl(false, undefined)).toBe('');
+  });
+});
 
 describe('api client', () => {
   it('keeps the refresh token in sessionStorage and never in localStorage', async () => {

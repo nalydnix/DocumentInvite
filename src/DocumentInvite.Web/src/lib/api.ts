@@ -1,5 +1,13 @@
-// Base URL of the API. Empty means same-origin (the dev proxy handles /api).
-export const apiBaseUrl: string = import.meta.env.VITE_API_BASE_URL ?? '';
+/**
+ * Base URL of the API. In development it is always empty, so requests are same-origin and go
+ * through the dev proxy (vite.config.ts); calling the API directly would be cross-origin and hit
+ * CORS. Production builds use VITE_API_BASE_URL (the API's origin, which allow-lists the web origin).
+ */
+export function resolveApiBaseUrl(isDev: boolean, configured: string | undefined): string {
+  return isDev ? '' : (configured ?? '');
+}
+
+export const apiBaseUrl: string = resolveApiBaseUrl(import.meta.env.DEV, import.meta.env.VITE_API_BASE_URL);
 
 // The access token lives in memory only. The refresh token lives in sessionStorage, so it
 // survives a reload of the tab but not closing it. Neither token is ever logged.
