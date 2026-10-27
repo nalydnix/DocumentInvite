@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Common;
+using DocumentInvite.Api.Common.Paging;
 using FluentValidation;
 
 namespace DocumentInvite.Api.Features.Audit;
@@ -16,8 +17,6 @@ public sealed record AuditEventResponse(
     string CorrelationId,
     string DetailsJson);
 
-public sealed record AuditPage(IReadOnlyList<AuditEventResponse> Items, int Total, int Page, int PageSize);
-
 /// <summary>Query-string filter for the audit list and its CSV export.</summary>
 /// <param name="From">Inclusive start of the date range.</param>
 /// <param name="To">Exclusive end of the date range.</param>
@@ -29,8 +28,8 @@ public sealed record AuditQuery(
     string? Action,
     string? TargetType,
     Guid? TargetId,
-    int Page = 1,
-    int PageSize = 25);
+    int Page = PagingDefaults.DefaultPage,
+    int PageSize = PagingDefaults.DefaultPageSize) : IPagedQuery;
 
 public sealed record AuditVerifyResponse(bool IsValid, long? FirstBrokenEventId, long EventsChecked);
 
@@ -42,12 +41,9 @@ public enum VerificationOutcome
 
 public sealed class AuditQueryValidator : AbstractValidator<AuditQuery>
 {
-    public const int MaxPageSize = 100;
-
     public AuditQueryValidator()
     {
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageSize).InclusiveBetween(1, MaxPageSize);
+        Include(new PagedQueryValidator<AuditQuery>());
         RuleFor(x => x.Action).MaximumLength(100);
         RuleFor(x => x.TargetType).MaximumLength(100);
         RuleFor(x => x.To)

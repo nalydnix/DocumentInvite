@@ -20,7 +20,7 @@ const ann: Contact = {
 };
 const bob: Contact = { ...ann, id: 'c2', firstName: 'Bob', lastName: 'Adams', email: 'bob@example.com', phone: null, partyType: 'Broker' };
 
-const page = (items: Contact[], total = items.length, pageNo = 1) => ({ items, total, page: pageNo, pageSize: 20 });
+const page = (items: Contact[], total = items.length, pageNo = 1) => ({ items, total, page: pageNo, pageSize: 25 });
 
 function signedIn(roles: Role[]) {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
@@ -45,7 +45,7 @@ describe('ContactsPage', () => {
   it('lists contacts with their party type and a create link for writers', async () => {
     mockApi({
       ...signedIn(['LoanOfficer']),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([ann, bob])),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann, bob])),
     });
 
     renderRoutes('/contacts');
@@ -61,7 +61,7 @@ describe('ContactsPage', () => {
   it('is read-only for a viewer', async () => {
     mockApi({
       ...signedIn(['Viewer']),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([ann])),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann])),
     });
 
     renderRoutes('/contacts');
@@ -74,8 +74,8 @@ describe('ContactsPage', () => {
   it('searches by the typed term', async () => {
     const { calls } = mockApi({
       ...signedIn(['Admin']),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([ann, bob])),
-      'GET /api/contacts?page=1&pageSize=20&search=bob': () => jsonResponse(200, page([bob])),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann, bob])),
+      'GET /api/contacts?page=1&pageSize=25&search=bob': () => jsonResponse(200, page([bob])),
     });
     renderRoutes('/contacts');
 
@@ -89,8 +89,8 @@ describe('ContactsPage', () => {
   it('shows an empty state and pages through results', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([ann], 21)),
-      'GET /api/contacts?page=2&pageSize=20': () => jsonResponse(200, page([bob], 21, 2)),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann], 26)),
+      'GET /api/contacts?page=2&pageSize=25': () => jsonResponse(200, page([bob], 26, 2)),
     });
     renderRoutes('/contacts');
     const user = userEvent.setup();
@@ -107,7 +107,7 @@ describe('ContactsPage', () => {
   it('says so when there are no contacts', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([])),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
 
     renderRoutes('/contacts');
@@ -121,7 +121,7 @@ describe('ContactFormPage', () => {
     const { calls } = mockApi({
       ...signedIn(['LoanOfficer']),
       'POST /api/contacts': () => jsonResponse(201, ann),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([ann])),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann])),
     });
     renderRoutes('/contacts/new');
     const user = userEvent.setup();
@@ -166,7 +166,7 @@ describe('ContactFormPage', () => {
       ...signedIn(['Admin']),
       'GET /api/contacts/c1': () => jsonResponse(200, ann),
       'PUT /api/contacts/c1': () => jsonResponse(200, { ...ann, firstName: 'Anna' }),
-      'GET /api/contacts?page=1&pageSize=20': () => jsonResponse(200, page([ann])),
+      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann])),
     });
     renderRoutes('/contacts/c1');
     const user = userEvent.setup();

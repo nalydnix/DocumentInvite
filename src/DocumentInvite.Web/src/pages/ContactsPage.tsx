@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { hasAnyRole, useAuth } from '../auth/AuthContext';
+import { Pagination } from '../components/Pagination';
 import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
+import { useClampPage, usePaging } from '../lib/paging';
 import {
-  CONTACTS_PAGE_SIZE,
   CONTACT_WRITER_ROLES,
   partyLabel,
   type Contact,
@@ -50,16 +51,13 @@ export function ContactsPage() {
   const { state } = useAuth();
   const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, CONTACT_WRITER_ROLES);
   const [search, setSearch] = useState('');
-  // The page belongs to the search it was chosen for, so a new search starts on page 1.
-  const [pageFor, setPageFor] = useState({ term: '', page: 1 });
+  const paging = usePaging();
   const term = useDebounced(search.trim(), 250);
-  const page = pageFor.term === term ? pageFor.page : 1;
-  const setPage = (update: (p: number) => number) => setPageFor({ term, page: update(page) });
 
   const contacts = useQuery({
-    queryKey: ['contacts', term, page],
+    queryKey: ['contacts', term, paging.page, paging.pageSize],
     queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(CONTACTS_PAGE_SIZE) });
+      const params = paging.params();
       if (term) params.set('search', term);
       return apiFetch<ContactPage>(`/api/contacts?${params}`);
     },
@@ -67,7 +65,7 @@ export function ContactsPage() {
   });
 
   const data = contacts.data;
-  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  useClampPage(paging, data?.total);
 
   return (
     <div className="space-y-6">
@@ -87,7 +85,10 @@ export function ContactsPage() {
           className={inputClass}
           placeholder="Name or email"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            paging.resetPage();
+          }}
         />
       </label>
 
@@ -108,28 +109,14 @@ export function ContactsPage() {
         </ul>
       )}
 
-      {data && pageCount > 1 && (
-        <nav aria-label="Pagination" className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
-          </button>
-          <span className="text-sm text-ink-muted">
-            Page {data.page} of {pageCount}
-          </span>
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </nav>
+      {data && (
+        <Pagination
+          page={paging.page}
+          pageSize={paging.pageSize}
+          total={data.total}
+          onPageChange={paging.setPage}
+          onPageSizeChange={paging.setPageSize}
+        />
       )}
     </div>
   );

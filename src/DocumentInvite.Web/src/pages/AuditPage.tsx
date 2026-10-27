@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Card } from '../components/Card';
+import { Pagination } from '../components/Pagination';
 import { ErrorList, Field, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiDownload, apiFetch } from '../lib/api';
-
-export const AUDIT_PAGE_SIZE = 25;
+import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 
 export interface AuditEvent {
   id: number;
@@ -20,12 +20,7 @@ export interface AuditEvent {
   detailsJson: string;
 }
 
-interface AuditPageData {
-  items: AuditEvent[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+type AuditPageData = PagedResponse<AuditEvent>;
 
 interface VerifyResult {
   isValid: boolean;
@@ -180,17 +175,18 @@ function VerifyPanel() {
 
 export function AuditPage() {
   const [filter, setFilter] = useState<Filter>(emptyFilter);
-  // The page belongs to the filter it was chosen for, so applying a new filter starts on page 1.
-  const [pageFor, setPageFor] = useState({ filter, page: 1 });
-  const page = pageFor.filter === filter ? pageFor.page : 1;
-  const setPage = (next: number) => setPageFor({ filter, page: next });
+  const paging = usePaging();
+  const applyFilter = (next: Filter) => {
+    setFilter(next);
+    paging.resetPage();
+  };
 
   const events = useQuery({
-    queryKey: ['audit', filter, page],
+    queryKey: ['audit', filter, paging.page, paging.pageSize],
     queryFn: () => {
       const params = filterParams(filter);
-      params.set('page', String(page));
-      params.set('pageSize', String(AUDIT_PAGE_SIZE));
+      params.set('page', String(paging.page));
+      params.set('pageSize', String(paging.pageSize));
       return apiFetch<AuditPageData>(`/api/audit?${params}`);
     },
     placeholderData: keepPreviousData,
@@ -211,7 +207,7 @@ export function AuditPage() {
   });
 
   const data = events.data;
-  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  useClampPage(paging, data?.total);
 
   return (
     <div className="space-y-6">
@@ -228,7 +224,7 @@ export function AuditPage() {
       </div>
       <ErrorList messages={messagesOf(exportCsv.error)} />
 
-      <FilterForm applied={filter} onApply={setFilter} />
+      <FilterForm applied={filter} onApply={applyFilter} />
       <VerifyPanel />
 
       {events.isPending && <p className="text-sm text-ink-muted">Loading audit events...</p>}
@@ -245,23 +241,14 @@ export function AuditPage() {
         </>
       )}
 
-      {data && pageCount > 1 && (
-        <nav aria-label="Pagination" className="flex items-center justify-between gap-3">
-          <button type="button" className={secondaryButtonClass} disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            Previous
-          </button>
-          <span className="text-sm text-ink-muted">
-            Page {data.page} of {pageCount}
-          </span>
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            disabled={page >= pageCount}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </button>
-        </nav>
+      {data && (
+        <Pagination
+          page={paging.page}
+          pageSize={paging.pageSize}
+          total={data.total}
+          onPageChange={paging.setPage}
+          onPageSizeChange={paging.setPageSize}
+        />
       )}
     </div>
   );

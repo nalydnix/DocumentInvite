@@ -152,6 +152,16 @@ All routes are under `/api` unless noted. Staff routes need a bearer token, and 
 - `/internal/jobs/reminders` (API key)
 - `/health`, `/scalar`, `/openapi/v1.json`
 
+### Pagination
+
+Any endpoint that returns a collection must be paginated with the shared contract. Exceptions are bounded lookups (a small, fixed set such as roles or enum values) and CSV or zip exports, which are streamed.
+
+- **Request**: query `page` (default 1, minimum 1) and `pageSize` (default 25, maximum 100). A query record implements `IPagedQuery` and its validator calls `Include(new PagedQueryValidator<T>())` from `Common/Paging`, so invalid values return a ProblemDetails 400. An endpoint with no filters can bind `PageQuery`.
+- **Response**: `PagedResponse<T>(Items, Total, Page, PageSize)`, serialised as `items`, `total`, `page`, `pageSize`.
+- **Ordering**: every paginated query must have a deterministic order that ends in a unique key (for example `OrderBy(LastName).ThenBy(FirstName).ThenBy(Id)`), so pages never overlap or skip rows. Build the query with that order and finish it with `ToPagedResponseAsync(query, map, ct)`.
+- **Past the end**: the API returns an empty `items` list with the real `total`. The web app falls back to the last page.
+- **Web**: use `usePaging()` (`src/lib/paging.ts`) and the `Pagination` component (`src/components/Pagination.tsx`). The page and page size live in the URL query string, and a filter or search change calls `resetPage()` to return to page 1.
+
 ## 13. Testing strategy
 
 - Unit tests cover the status calculator, file naming and sanitisation, token hashing, hash-chain calculation, reminder eligibility and the PII-masking policy.
