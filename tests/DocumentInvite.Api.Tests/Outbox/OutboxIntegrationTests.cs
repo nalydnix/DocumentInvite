@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests.Outbox;
 
-public class OutboxIntegrationTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class OutboxIntegrationTests : StaffTestBase
 {
     private static readonly EmailMessage Sample = EmailMessage.From(
         "pat@example.com",

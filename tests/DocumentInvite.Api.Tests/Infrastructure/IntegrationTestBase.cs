@@ -8,8 +8,7 @@ namespace DocumentInvite.Api.Tests.Infrastructure;
 /// Base class for integration tests. Each test class gets its own migrated database and
 /// a <see cref="WebApplicationFactory{TEntryPoint}"/> wired to it.
 /// </summary>
-[Collection(SqlServerCollection.Name)]
-public abstract class IntegrationTestBase(SqlServerFixture sql) : IAsyncLifetime
+public abstract class IntegrationTestBase : IAsyncLifetime
 {
     private WebApplicationFactory<Program>? _factory;
 
@@ -19,7 +18,7 @@ public abstract class IntegrationTestBase(SqlServerFixture sql) : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        ConnectionString = await sql.CreateDatabaseAsync();
+        ConnectionString = await SqlServerFixture.CreateDatabaseAsync();
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
@@ -42,6 +41,11 @@ public abstract class IntegrationTestBase(SqlServerFixture sql) : IAsyncLifetime
         if (_factory is not null)
         {
             await _factory.DisposeAsync();
+        }
+
+        if (ConnectionString.Length > 0)
+        {
+            await SqlServerFixture.DropDatabaseAsync(ConnectionString);
         }
     }
 }

@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 
 namespace DocumentInvite.Api.Tests.Auth;
 
-public class UserManagementTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class UserManagementTests : StaffTestBase
 {
     private const string NewPassword = "Another-Strong-Pw-1";
 
