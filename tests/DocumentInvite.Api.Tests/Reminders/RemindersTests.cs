@@ -8,6 +8,7 @@ using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Contacts;
 using DocumentInvite.Api.Features.Invites;
 using DocumentInvite.Api.Features.Loans;
+using DocumentInvite.Api.Features.Outbox;
 using DocumentInvite.Api.Features.Reminders;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using DocumentInvite.Api.Tests.Infrastructure;
@@ -103,12 +104,24 @@ public partial class RemindersTests : StaffTestBase
     }
 
     private readonly TestClock _clock = new();
+    private bool _failDelivery;
+
+    /// <summary>Stores the email like the demo sender, then reports it as not delivered when switched on.</summary>
+    private sealed class SwitchableSender(IEmailSender inner, Func<bool> fail) : IEmailSender
+    {
+        public async Task<EmailSendResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+        {
+            var result = await inner.SendAsync(message, cancellationToken);
+            return fail() ? result with { Delivered = false, Error = "simulated failure" } : result;
+        }
+    }
 
     protected override void ConfigureServices(IServiceCollection services)
     {
         base.ConfigureServices(services);
         services.AddSingleton<TimeProvider>(_clock);
         services.Configure<JobsOptions>(o => o.ApiKey = ApiKey);
+        services.AddScoped<IEmailSender>(sp => new SwitchableSender(sp.GetRequiredService<DemoOutboxEmailSender>(), () => _failDelivery));
     }
 
     private DateOnly Today => DateOnly.FromDateTime(_clock.Now.UtcDateTime);
@@ -456,5 +469,41 @@ public partial class RemindersTests : StaffTestBase
         _clock.Now = _clock.Now.AddDays(1);
 
         (await RunScheduledAsync()).AlreadyRan.Should().BeFalse();
+    }
+
+    // ---- failed delivery ----
+
+    [Fact]
+    public async Task A_failed_delivery_rolls_back_so_the_old_link_works_and_the_invite_is_retried_next_window()
+    {
+        var (_, inviteId, _) = await SendInviteAsync(interval: 3);
+        var originalToken = TokenIn((await EmailsAsync()).Single());
+        var before = await InviteRowAsync(inviteId);
+        _clock.Now = _clock.Now.AddDays(3);
+
+        _failDelivery = true;
+        var failed = await RunScheduledAsync();
+
+        failed.Failed.Should().Be(1);
+        failed.InvitesDue.Should().Be(1);
+        failed.RemindersSent.Should().Be(0);
+        (await EmailsAsync()).Should().HaveCount(1, "the outbox row of the failed email is rolled back");
+        var after = await InviteRowAsync(inviteId);
+        after.TokenHash.Should().Equal(before.TokenHash);
+        after.LastReminderAt.Should().BeNull();
+        after.OverdueNoticeSentAt.Should().BeNull();
+        (await ResolveAsync(originalToken)).IsValid.Should().BeTrue("the old link keeps working");
+
+        _failDelivery = false;
+        _clock.Now = _clock.Now.AddHours(1);
+        var retry = await RunScheduledAsync();
+
+        retry.AlreadyRan.Should().BeFalse();
+        retry.RemindersSent.Should().Be(1);
+        retry.Failed.Should().Be(0);
+        var emails = await EmailsAsync();
+        emails.Should().HaveCount(2);
+        (await ResolveAsync(TokenIn(emails[1]))).IsValid.Should().BeTrue();
+        (await ResolveAsync(originalToken)).IsValid.Should().BeFalse();
     }
 }
