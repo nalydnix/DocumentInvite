@@ -57,3 +57,9 @@ VITE_PORT=5174 VITE_API_BASE_URL=http://localhost:5301 npm run dev
 ## Audit trail database permissions
 
 Migrations create the `audit_writer` database role: `SELECT` and `INSERT` are granted and `UPDATE` and `DELETE` are denied on `dbo.AuditEvents`. Add the runtime application database user to this role (`ALTER ROLE audit_writer ADD MEMBER [app_user]`). The DENY overrides broader grants such as `db_datawriter`. Run migrations under a separate privileged identity (`ConnectionStrings:Migrations`).
+
+## Staff authentication
+
+- Sign-in and token refresh are served at `POST /api/auth/login` and `POST /api/auth/refresh` (ASP.NET Core Identity bearer tokens). Registration, password reset and e-mail confirmation are disabled; Admins create users under `/api/users`.
+- Apply the migrations (`dotnet ef database update --project src/DocumentInvite.Api`) to create the Identity tables and seed the roles Admin, LoanOfficer, Viewer and Auditor.
+- The first Admin is created on startup when `Bootstrap:AdminEmail` and `Bootstrap:AdminPassword` are configured (`Bootstrap__AdminEmail` and `Bootstrap__AdminPassword` as environment variables) and no Admin exists yet. `appsettings.Development.json` sets `admin@documentinvite.local` for local use; production must supply its own values through secrets and remove them after the first start.

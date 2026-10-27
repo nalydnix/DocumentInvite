@@ -1,15 +1,39 @@
 using DocumentInvite.Api.Domain;
+using DocumentInvite.Api.Features.Auth;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocumentInvite.Api.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<AppUser, AppRole, Guid>(options)
 {
+    // Fixed ids and stamps keep the seeded roles identical in every database and migration.
+    private static readonly (string Name, Guid Id)[] SeededRoles =
+    [
+        (StaffRoles.Admin, new Guid("a1000000-0000-0000-0000-000000000001")),
+        (StaffRoles.LoanOfficer, new Guid("a1000000-0000-0000-0000-000000000002")),
+        (StaffRoles.Viewer, new Guid("a1000000-0000-0000-0000-000000000003")),
+        (StaffRoles.Auditor, new Guid("a1000000-0000-0000-0000-000000000004")),
+    ];
+
     public DbSet<AppSettings> Settings => Set<AppSettings>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<AppUser>(e => e.Property(x => x.DisplayName).HasMaxLength(200).IsRequired());
+
+        modelBuilder.Entity<AppRole>().HasData(SeededRoles.Select(r => new AppRole
+        {
+            Id = r.Id,
+            Name = r.Name,
+            NormalizedName = r.Name.ToUpperInvariant(),
+            ConcurrencyStamp = r.Id.ToString("D"),
+        }));
+
         modelBuilder.Entity<AppSettings>(e =>
         {
             e.ToTable("AppSettings");
