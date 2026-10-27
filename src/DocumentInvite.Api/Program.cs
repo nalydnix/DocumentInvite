@@ -1,5 +1,6 @@
 using DocumentInvite.Api.Common;
 using DocumentInvite.Api.Features.Auth;
+using DocumentInvite.Api.Features.Files;
 using DocumentInvite.Api.Features.Invites;
 using DocumentInvite.Api.Features.Loans;
 using DocumentInvite.Api.Features.Templates;
@@ -16,6 +17,7 @@ builder.Services.AddLoans();
 builder.Services.AddInvites();
 builder.Services.AddEmail();
 builder.Services.AddReminders();
+builder.Services.AddFiles();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

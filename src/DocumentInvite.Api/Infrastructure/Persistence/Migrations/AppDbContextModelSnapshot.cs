@@ -586,6 +586,66 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("RequestItems", (string)null);
                 });
 
+            modelBuilder.Entity("DocumentInvite.Api.Domain.StoredFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BlobName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<Guid>("RequestItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("Sha256")
+                        .HasColumnType("binary(32)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("StoredFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTimeOffset?>("UploadedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlobName")
+                        .IsUnique();
+
+                    b.HasIndex("RequestItemId", "Sequence")
+                        .IsUnique()
+                        .HasFilter("[Sequence] IS NOT NULL");
+
+                    b.ToTable("StoredFiles", (string)null);
+                });
+
             modelBuilder.Entity("DocumentInvite.Api.Domain.Template", b =>
                 {
                     b.Property<Guid>("Id")
@@ -786,6 +846,15 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.HasOne("DocumentInvite.Api.Domain.Invite", null)
                         .WithMany("Items")
                         .HasForeignKey("InviteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DocumentInvite.Api.Domain.StoredFile", b =>
+                {
+                    b.HasOne("DocumentInvite.Api.Domain.RequestItem", null)
+                        .WithMany()
+                        .HasForeignKey("RequestItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

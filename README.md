@@ -16,6 +16,25 @@ docker compose up -d
 
 Starts SQL Server (port 1433) and Azurite (blob 10000, queue 10001, table 10002). Override host ports with `SQL_PORT`, `AZURITE_BLOB_PORT`, `AZURITE_QUEUE_PORT` and `AZURITE_TABLE_PORT`, and the SA password with `MSSQL_SA_PASSWORD` (for example in an untracked `.env` file).
 
+## File storage
+
+Uploads go straight from the browser to Azure Blob Storage with a write-only SAS URL (valid 10 minutes), and previews and downloads use read-only SAS URLs (valid 5 minutes). `Blob:ConnectionString` selects the account (`UseDevelopmentStorage=true` targets Azurite) and `Blob:ContainerName` the private container.
+
+Browser `PUT` uploads need a CORS rule on the storage account's Blob service. In development the browser only talks to the API through the dev proxy, but direct uploads go to the storage endpoint, so configure the rule for the web origin:
+
+| Setting | Value |
+| --- | --- |
+| Allowed origins | The web app origin, for example `https://app.example.com` (not `*` in production) |
+| Allowed methods | `PUT`, `GET`, `HEAD`, `OPTIONS` |
+| Allowed headers | `x-ms-blob-type`, `content-type`, `x-ms-*` |
+| Exposed headers | `ETag`, `x-ms-*` |
+| Max age | `3600` |
+
+```bash
+az storage cors add --services b --methods PUT GET HEAD OPTIONS --origins <origin> \
+  --allowed-headers "x-ms-*" content-type --exposed-headers "x-ms-*" ETag --max-age 3600 --account-name <account>
+```
+
 ## API
 
 ```bash
