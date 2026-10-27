@@ -2,7 +2,7 @@
 name: Bug
 about: Existing behaviour that does not meet expectations
 title: ''
-labels: bug, status:todo
+labels: bug, status:backlog
 assignees: ''
 ---
 
