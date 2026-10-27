@@ -1,5 +1,8 @@
+import { useAuth } from '../auth/AuthContext';
 import { Card } from '../components/Card';
 
 export function HomePage() {
-  return <Card title="Welcome to DocumentInvite">Secure document collection for lenders.</Card>;
+  const { state } = useAuth();
+  const name = state.status === 'authenticated' ? state.user.displayName : '';
+  return <Card title={`Welcome${name ? `, ${name}` : ''}`}>Secure document collection for lenders.</Card>;
 }
