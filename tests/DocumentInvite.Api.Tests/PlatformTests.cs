@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests;
 
-public class PlatformTests(SqlServerFixture sql) : PlatformTestBase(sql)
+public class PlatformTests : PlatformTestBase
 {
     [Fact]
     public async Task Migrations_are_applied_and_settings_row_is_seeded()

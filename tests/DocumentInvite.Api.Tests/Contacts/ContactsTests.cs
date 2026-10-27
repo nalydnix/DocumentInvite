@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests.Contacts;
 
-public class ContactsTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class ContactsTests : StaffTestBase
 {
     private static ContactRequest Valid(
         string first = "Ann", string last = "Lee", string email = "ann.lee@example.com",

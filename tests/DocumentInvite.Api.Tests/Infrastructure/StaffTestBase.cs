@@ -13,7 +13,7 @@ namespace DocumentInvite.Api.Tests.Infrastructure;
 public sealed record TokenResponse(string AccessToken, string RefreshToken);
 
 /// <summary>Helpers for tests that sign staff in through the real HTTP endpoints.</summary>
-public abstract class StaffTestBase(SqlServerFixture sql) : IntegrationTestBase(sql)
+public abstract class StaffTestBase : IntegrationTestBase
 {
     protected const string Password = "Correct-Horse-12";
 

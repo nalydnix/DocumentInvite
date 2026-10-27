@@ -9,7 +9,7 @@ using Microsoft.Data.SqlClient;
 
 namespace DocumentInvite.Api.Tests.Audit;
 
-public class AuditApiTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class AuditApiTests : StaffTestBase
 {
     private static readonly string[] AuditUrls =
         ["/api/audit", "/api/audit/export.csv"];

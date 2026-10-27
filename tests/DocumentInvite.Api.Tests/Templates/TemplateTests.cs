@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests.Templates;
 
-public class TemplateTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class TemplateTests : StaffTestBase
 {
     private Task<HttpClient> OfficerAsync() => ClientForAsync("officer@example.com", [StaffRoles.LoanOfficer]);
 
