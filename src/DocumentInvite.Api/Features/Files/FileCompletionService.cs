@@ -90,9 +90,19 @@ public sealed class FileCompletionService(
             }
 
             finalType = FileTypes.Find(FileTypes.Pdf)!;
-            using var converted = new MemoryStream(content, writable: false);
-            await blobs.WriteAsync(file.BlobName, converted, finalType.ContentType, ct);
         }
+
+        // The upload SAS stays valid after completion, so the uploader could still overwrite the upload blob.
+        // Serve only the validated bytes: copy them to a new server-chosen name and drop the upload blob.
+        var uploadBlobName = file.BlobName;
+        var servedBlobName = $"{uploadBlobName[..(uploadBlobName.LastIndexOf('/') + 1)]}{Guid.NewGuid():D}";
+        using (var validated = new MemoryStream(content, writable: false))
+        {
+            await blobs.WriteAsync(servedBlobName, validated, finalType.ContentType, ct);
+        }
+
+        await blobs.DeleteAsync(uploadBlobName, ct);
+        file.BlobName = servedBlobName;
 
         var names = await db.RequestItems.AsNoTracking()
             .Where(i => i.Id == file.RequestItemId)

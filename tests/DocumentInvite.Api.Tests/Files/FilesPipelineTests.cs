@@ -363,6 +363,24 @@ public class FilesPipelineTests : IntegrationTestBase
     // ---- reads ----
 
     [Fact]
+    public async Task A_write_to_the_upload_blob_after_completion_does_not_change_what_the_read_url_serves()
+    {
+        var seeded = await SeedAsync();
+        var id = await UploadAsync(seeded, "a.pdf", "application/pdf", Pdf);
+        var uploadBlobName = (await FileAsync(id)).BlobName;
+        await CompleteAsync(id);
+
+        _blobs.Put(uploadBlobName, "tampered"u8.ToArray(), "application/pdf"); // the still-valid upload SAS
+
+        var file = await FileAsync(id);
+        var read = await WithServiceAsync((_, _, r) => r.CreateReadUrlAsync(id, download: false, default));
+        file.BlobName.Should().NotBe(uploadBlobName);
+        read.Value!.Url.ToString().Should().Contain(file.BlobName).And.NotContain(uploadBlobName);
+        _blobs.Get(file.BlobName).Should().Equal(Pdf);
+        file.Sha256.Should().Equal(SHA256.HashData(Pdf));
+    }
+
+    [Fact]
     public async Task Preview_and_download_urls_are_valid_for_five_minutes_and_audited()
     {
         var seeded = await SeedAsync();
