@@ -10,6 +10,7 @@ public static class FilesServiceCollectionExtensions
     {
         services.AddOptions<BlobOptions>().BindConfiguration(BlobOptions.Section);
         services.AddSingleton<IBlobStore, AzureBlobStore>();
+        services.AddHostedService<BlobCorsConfigurator>();
         services.AddSingleton<IImagePdfConverter, QuestPdfImageConverter>();
         services.AddScoped<UploadSlotService>();
         services.AddScoped<FileCompletionService>();

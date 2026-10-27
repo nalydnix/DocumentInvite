@@ -52,6 +52,7 @@ export interface Invite {
   tokenExpiresAt: string;
   revokedAt: string | null;
   status: CollectionStatus;
+  hasPassword: boolean;
   items: InviteItem[];
 }
 

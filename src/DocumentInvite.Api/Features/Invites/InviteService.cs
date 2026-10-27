@@ -2,6 +2,7 @@ using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Features.Outbox;
 using DocumentInvite.Api.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocumentInvite.Api.Features.Invites;
@@ -21,6 +22,7 @@ public sealed class InviteService(
     IAuditLog audit,
     IEmailSender email,
     IPortalLinkBuilder links,
+    IPasswordHasher<Invite> hasher,
     TimeProvider clock)
 {
     /// <summary>How long a link stays valid after the due date, unless it is reissued.</summary>
@@ -110,6 +112,11 @@ public sealed class InviteService(
                     SortOrder = order,
                 }).ToList(),
             };
+            if (!string.IsNullOrEmpty(party.Password))
+            {
+                invite.PasswordHash = hasher.HashPassword(invite, party.Password);
+            }
+
             loan.Invites.Add(invite);
             db.Invites.Add(invite);
             created.Add((invite, contacts[invite.ContactId], token));
@@ -253,7 +260,7 @@ public sealed class InviteService(
         invite.Id, invite.LoanId, invite.ContactId,
         $"{contact.FirstName} {contact.LastName}", contact.Email, contact.PartyType,
         invite.DueDate, invite.ReminderIntervalDays, invite.SentAt, invite.TokenExpiresAt, invite.RevokedAt,
-        invite.Status,
+        invite.Status, invite.PasswordHash is not null,
         invite.Items.OrderBy(i => i.SortOrder).Select(i => new InviteItemResponse(
             i.Id, i.Name, i.Kind, i.Instructions, i.AllowMultiple, i.FieldType, i.IsRequired, i.SortOrder, i.Status))
             .ToList());

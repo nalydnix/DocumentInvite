@@ -45,6 +45,11 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
           <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
             {partyLabel(invite.partyType)}
           </span>
+          {invite.hasPassword && (
+            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-muted">
+              Password protected
+            </span>
+          )}
           {revoked ? (
             <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Link revoked</span>
           ) : (
