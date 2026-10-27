@@ -21,15 +21,19 @@ public static class PlatformServiceCollectionExtensions
                 .Enrich.FromLogContext()
                 .Enrich.With<PiiMaskingEnricher>();
 
+            // Sinks are wrapped so that exception text is masked before it is written.
+            var console = new LoggerConfiguration();
             if (context.HostingEnvironment.IsDevelopment())
             {
-                logger.WriteTo.Console(outputTemplate:
+                console.WriteTo.Console(outputTemplate:
                     "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj}{NewLine}{Exception}");
             }
             else
             {
-                logger.WriteTo.Console(new RenderedCompactJsonFormatter());
+                console.WriteTo.Console(new RenderedCompactJsonFormatter());
             }
+
+            logger.WriteTo.Sink(new ExceptionMaskingSink(console.CreateLogger()));
         });
 
         var services = builder.Services;

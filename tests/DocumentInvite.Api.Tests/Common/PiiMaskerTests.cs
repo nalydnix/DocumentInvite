@@ -77,3 +77,41 @@ public class PiiMaskerTests
         public void Emit(LogEvent logEvent) => Events.Add(logEvent);
     }
 }
+
+public class ExceptionMaskingSinkTests
+{
+    private const string Token = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
+
+    [Fact]
+    public void Exception_text_is_masked_before_reaching_the_inner_sink()
+    {
+        var captured = new List<LogEvent>();
+        var inner = new LoggerConfiguration().WriteTo.Sink(new Collector(captured)).CreateLogger();
+        var log = new LoggerConfiguration().WriteTo.Sink(new ExceptionMaskingSink(inner)).CreateLogger();
+        var exception = new InvalidOperationException($"Duplicate key jane@example.com for /p/{Token}");
+
+        log.Error(exception, "Failed");
+
+        var emitted = captured.Single().Exception!;
+        var text = emitted.ToString() + emitted.Message;
+        text.Should().NotContain("jane@example.com").And.NotContain(Token);
+        text.Should().Contain("[email]").And.Contain("[token]").And.Contain("InvalidOperationException");
+    }
+
+    [Fact]
+    public void Events_without_exceptions_pass_through_unchanged()
+    {
+        var captured = new List<LogEvent>();
+        var inner = new LoggerConfiguration().WriteTo.Sink(new Collector(captured)).CreateLogger();
+        var log = new LoggerConfiguration().WriteTo.Sink(new ExceptionMaskingSink(inner)).CreateLogger();
+
+        log.Information("Hello {Count}", 1);
+
+        captured.Single().Exception.Should().BeNull();
+    }
+
+    private sealed class Collector(List<LogEvent> events) : ILogEventSink
+    {
+        public void Emit(LogEvent logEvent) => events.Add(logEvent);
+    }
+}
