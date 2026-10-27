@@ -1,11 +1,13 @@
 using DocumentInvite.Api.Common;
 using DocumentInvite.Api.Features.Auth;
+using DocumentInvite.Api.Features.Templates;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddPlatform();
 builder.Services.AddStaffAuth();
+builder.Services.AddTemplates();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

@@ -61,7 +61,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 
 - **AppUser** (Identity): `DisplayName`, `AccessExpiresAt?` (used by the Auditor role; enforced on sign-in and on every request).
 - **Contact**: `FirstName`, `LastName`, `Email`, `Phone?`, `PartyType` (Borrower, CoBorrower, Guarantor, Broker, Attorney, Accountant), `IsPseudonymised`, `ErasedAt?`.
-- **Template**: `Name`, `Description`, `IsSeeded`, and its **TemplateItems**: `Name`, `Kind` (FileUpload or FormField), `Instructions`, `AllowMultiple` (FileUpload), `FieldType` (Text, Number, Date, YesNo; FormField only), `IsRequired`, `SortOrder`.
+- **Template**: `Name`, `Description`, `IsSeeded`, `ArchivedAt?` (archived templates are hidden by default and cannot be edited until restored), and its **TemplateItems**: `Name`, `Kind` (FileUpload or FormField), `Instructions`, `AllowMultiple` (FileUpload), `FieldType` (Text, Number, Date, YesNo; FormField only), `IsRequired`, `SortOrder`.
 - **Loan**: `Reference` (unique, used in file names), `Name`, `Amount` (decimal), `LoanType`, `CreatedBy`, `CompletedAt?`, plus a derived `Status`.
 - **Invite** (one per party per loan): `LoanId`, `ContactId`, `DueDate`, `ReminderIntervalDays`, `LastReminderAt?`, `OverdueNoticeSentAt?`, `TokenHash`, `TokenExpiresAt`, `RevokedAt?`, `PasswordHash?`, `PrivacyAcceptedAt?`, `SentAt`, plus a derived `Status`.
 - **RequestItem** (copied from template items onto an invite, then editable): `Name`, `Kind`, `Instructions`, `AllowMultiple`, `FieldType`, `Status` (Outstanding, Submitted, Approved, Rejected), `RejectionReason?`, `FieldValue?`, `PartyNote?`, `ReviewedBy?`, `ReviewedAt?`.
@@ -140,7 +140,7 @@ All routes are under `/api` unless noted. Staff routes need a bearer token, and 
 
 - `/api/auth/*` (MapIdentityApi, with registration disabled), `/api/me`
 - `/api/users` (Admin: create, list, set roles, set access expiry)
-- `/api/contacts`, `/api/templates`, `/api/loans`, `/api/loans/{id}/invites`, `/api/invites/{id}` (revoke, reissue, items)
+- `/api/contacts`, `/api/templates` (list, get, create, edit with item reorder, `archive`, `restore`), `/api/loans`, `/api/loans/{id}/invites`, `/api/invites/{id}` (revoke, reissue, items)
 - `/api/items/{id}/approve|reject`, `/api/files/{id}/preview-url|download-url`
 - `/api/loans/{id}/export` (zip)
 - `/api/invites/{id}/messages`, `/api/invites/{id}/notes`

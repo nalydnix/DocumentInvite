@@ -19,6 +19,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AppSettings> Settings => Set<AppSettings>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<Template> Templates => Set<Template>();
+    public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +42,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasData(new AppSettings());
+        });
+
+        modelBuilder.Entity<Template>(e =>
+        {
+            e.ToTable("Templates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TemplateItem>(e =>
+        {
+            e.ToTable("TemplateItems");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Instructions).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.FieldType).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.TemplateId, x.SortOrder });
         });
 
         modelBuilder.Entity<AuditEvent>(e =>

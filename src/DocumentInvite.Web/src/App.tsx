@@ -5,6 +5,8 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { TemplateEditorPage } from './pages/TemplateEditorPage';
+import { TemplatesPage } from './pages/TemplatesPage';
 import { UsersPage } from './pages/UsersPage';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -19,6 +21,11 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route index element={<HomePage />} />
+                <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer', 'Viewer']} />}>
+                  <Route path="templates" element={<TemplatesPage />} />
+                  <Route path="templates/new" element={<TemplateEditorPage />} />
+                  <Route path="templates/:id" element={<TemplateEditorPage />} />
+                </Route>
                 <Route element={<ProtectedRoute roles={['Admin']} />}>
                   <Route path="users" element={<UsersPage />} />
                 </Route>
