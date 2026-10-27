@@ -6,7 +6,79 @@ on:
     branches: [main]
 
 jobs:
+  record-tree:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record tested tree
+        run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-tree
+          path: tested-tree.txt
+          retention-days: 14
+
+  reuse:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decide whether the PR CI result can be reused
+        id: decide
+        run: |
+          set -euo pipefail
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+          pr_head=$(gh api "repos/$REPO/commits/$SHA/pulls" \
+            --jq '[.[] | select(.base.ref == "main")] | first | .head.sha // empty')
+          if [ -z "$pr_head" ]; then
+            echo "No pull request found for $SHA; running the full suite."
+            exit 0
+          fi
+
+          run_id=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&head_sha=$pr_head&per_page=1" \
+            --jq '.workflow_runs[0].id // empty')
+          if [ -z "$run_id" ]; then
+            echo "No successful pull_request run for $pr_head; running the full suite."
+            exit 0
+          fi
+
+          has_artifact=$(gh api "repos/$REPO/actions/runs/$run_id/artifacts?name=tested-tree" \
+            --jq '[.artifacts[] | select(.expired == false)] | length')
+          if [ "$has_artifact" -eq 0 ]; then
+            echo "Run $run_id has no tested-tree artifact; running the full suite."
+            exit 0
+          fi
+
+          run_url="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${run_id}"
+          mkdir "$RUNNER_TEMP/tested-tree"
+          gh run download "$run_id" --repo "$REPO" --name tested-tree --dir "$RUNNER_TEMP/tested-tree"
+          tested=$(tr -d '[:space:]' < "$RUNNER_TEMP/tested-tree/tested-tree.txt")
+          current=$(git rev-parse 'HEAD^{tree}')
+
+          if [ -n "$tested" ] && [ "$tested" = "$current" ]; then
+            echo "Tree $current matches the tree tested by $run_url; skipping the full suite."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tree $current differs from tested tree ${tested:-<empty>} ($run_url); running the full suite."
+          fi
+
   api:
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.result != 'failure' && needs.reuse.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +89,8 @@ jobs:
       - run: dotnet test --configuration Release --no-build
 
   web:
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.result != 'failure' && needs.reuse.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
