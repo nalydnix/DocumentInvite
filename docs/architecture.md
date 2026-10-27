@@ -67,7 +67,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 - **RequestItem** (copied from template items onto an invite, then editable): `Name`, `Kind`, `Instructions`, `AllowMultiple`, `FieldType`, `Status` (Outstanding, Submitted, Approved, Rejected), `RejectionReason?`, `FieldValue?`, `PartyNote?`, `ReviewedBy?`, `ReviewedAt?`.
 - **StoredFile**: `RequestItemId`, `BlobName` (an opaque GUID path), `OriginalFileName`, `StoredFileName` (the canonical name, see §8), `ContentType`, `SizeBytes`, `Sha256`, `Sequence` (n), `Status` (PendingUpload, Ready, Superseded), `UploadedAt`.
 - **Message**: `InviteId`, `AuthorType` (Team or Party), `AuthorUserId?`, `Body`, `IsInternal` (internal notes are never returned to the portal), `CreatedAt`.
-- **OutboxEmail**: `To`, `Subject`, `HtmlBody`, `TextBody`, `CreatedAt`, `Provider`, `ProviderMessageId?`. Every email is stored here, so `/outbox` can render it.
+- **OutboxEmail**: `To`, `Subject`, `HtmlBody`, `TextBody`, `CreatedAt`, `Provider`, `ProviderMessageId?`, `DeliveryError?`. Every email is stored here, so `/outbox` can render it.
 - **AuditEvent** (append-only): `Id` (a `bigint` identity, which gives the chain order), `OccurredAt`, `ActorType` (User, Party, System, Anonymous), `ActorId?`, `Action` (a dotted code such as `item.approved`), `TargetType`, `TargetId?`, `IpAddress?`, `UserAgent?`, `CorrelationId`, `DetailsJson` (ids and enum values only), `PrevHash`, `Hash`.
 - **AppSettings** (a single row): `RetentionDaysAfterCompletion`, `DefaultReminderIntervalDays`, and similar values.
 - **JobRun**: `JobName`, `WindowKey`, `StartedAt`, `FinishedAt?`, `Result`. This table makes jobs idempotent (see §6).
@@ -125,7 +125,8 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 ## 10. Email
 
 - `IEmailSender.SendAsync(EmailMessage)`. Templates are simple Razor-free C# string builders or embedded HTML templates covering: invite, reminder, overdue notice, item rejected, and new message.
-- Every email is written to `OutboxEmail`. When `Email:Provider=Resend`, it is also sent through the Resend HTTP API, with the API key read from configuration.
+- Every email is written to `OutboxEmail` first (in the caller's transaction when one is open). When `Email:Provider=Resend`, it is then sent through the Resend HTTP API (`Resend:ApiKey` and `Email:From` come from configuration). A Resend failure is logged without addresses, recorded in `DeliveryError`, and returned to the caller as `EmailSendResult(Delivered=false)`; it is not thrown and the stored copy is kept.
+- `GET /api/outbox` (paged, newest first) and `GET /api/outbox/{id}` need `RequireStaff`, because stored emails hold live portal links.
 - `/outbox` (a staff route in the web app) lists the stored emails and renders the HTML in a sandboxed iframe, so portal links can be clicked. In demo mode this is how the demo is driven.
 
 ## 11. Demo mode
@@ -165,7 +166,7 @@ All routes are under `/api` unless noted. Staff routes need a bearer token, and 
 - **Storage**: an Azure Storage account with a private container, and CORS allowing `PUT` from the web origin for SAS uploads.
 - **Web**: Vercel via its Git integration (no deploy workflow), with `VITE_API_BASE_URL` pointing at the API and SPA rewrites to `index.html`.
 - **Cron**: `.github/workflows/reminders-cron.yml` runs hourly and calls `POST /internal/jobs/reminders` with `X-Api-Key` from repository secrets.
-- **Configuration**: `ConnectionStrings__Default`, `ConnectionStrings__Migrations`, `Blob__ConnectionString`, `Jwt`/Identity settings, `Email__Provider`, `Resend__ApiKey`, `Jobs__ApiKey`, `Demo__Enabled`, `Cors__Origins`, `Portal__BaseUrl`, `Bootstrap__AdminEmail`, `Bootstrap__AdminPassword`.
+- **Configuration**: `ConnectionStrings__Default`, `ConnectionStrings__Migrations`, `Blob__ConnectionString`, `Jwt`/Identity settings, `Email__Provider`, `Resend__ApiKey`, `Jobs__ApiKey`, `Demo__Enabled`, `Cors__Origins`, `Portal__BaseUrl`, `Email__From`, `Bootstrap__AdminEmail`, `Bootstrap__AdminPassword`.
 - **Local**: `docker compose up` (SQL Server and Azurite), then `dotnet run` and `npm run dev`. The ports can be configured (`--urls` / `ASPNETCORE_URLS` for the API, `--port` / `VITE_PORT` for the web app), so several test instances can run side by side.
 
 ## 15. Assumptions and exclusions
