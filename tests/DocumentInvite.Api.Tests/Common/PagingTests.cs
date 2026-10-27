@@ -62,10 +62,6 @@ public class PagingUnitTests
 
 public class PagingApiTests : StaffTestBase
 {
-    public PagingApiTests(SqlServerFixture sql) : base(sql)
-    {
-    }
-
     [Theory]
     [InlineData("page=0")]
     [InlineData("pageSize=0")]
