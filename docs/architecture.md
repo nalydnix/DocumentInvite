@@ -167,7 +167,7 @@ All routes are under `/api` unless noted. Staff routes need a bearer token, and 
 - **Web**: Vercel via its Git integration (no deploy workflow), with `VITE_API_BASE_URL` pointing at the API and SPA rewrites to `index.html`.
 - **Cron**: `.github/workflows/reminders-cron.yml` runs hourly and calls `POST /internal/jobs/reminders` with `X-Api-Key` from repository secrets.
 - **Configuration**: `ConnectionStrings__Default`, `ConnectionStrings__Migrations`, `Blob__ConnectionString`, `Jwt`/Identity settings, `Email__Provider`, `Resend__ApiKey`, `Jobs__ApiKey`, `Demo__Enabled`, `Cors__Origins`, `Portal__BaseUrl`, `Email__From`, `Bootstrap__AdminEmail`, `Bootstrap__AdminPassword`.
-- **Local**: `docker compose up` (SQL Server and Azurite), then `dotnet run` and `npm run dev`. The ports can be configured (`--urls` / `ASPNETCORE_URLS` for the API, `--port` / `VITE_PORT` for the web app), so several test instances can run side by side.
+- **Local**: `docker compose up` (SQL Server and Azurite), then `dotnet run` and `npm run dev`. The ports can be configured (`--urls` / `ASPNETCORE_URLS` for the API, `--port` / `VITE_PORT` for the web app, `VITE_API_PROXY_TARGET` for the dev proxy target; in development the browser uses relative `/api` URLs through that proxy, and `VITE_API_BASE_URL` applies to production builds only), so several test instances can run side by side.
 
 ## 15. Assumptions and exclusions
 

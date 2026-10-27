@@ -45,13 +45,13 @@ Ports are never hard-coded, so multiple instances can run at once.
 
 - API port: `ASPNETCORE_URLS=http://localhost:5301 dotnet run --project src/DocumentInvite.Api`, or `dotnet run --project src/DocumentInvite.Api --urls http://localhost:5301`.
 - Web port: `npm run dev -- --port 5174`, or set `VITE_PORT=5174`.
-- Point the web app at the matching API with `VITE_API_BASE_URL=http://localhost:5301`. The dev server proxies `/api` requests to it. Put these in an untracked `src/DocumentInvite.Web/.env.local`.
+- Point the dev proxy at the matching API with `VITE_API_PROXY_TARGET=http://localhost:5301` (`VITE_API_BASE_URL` is also accepted as the proxy target). In development the browser always calls relative `/api` URLs and the dev server proxies them to the API, so no CORS configuration is needed. `VITE_API_BASE_URL` only takes effect in production builds. Put these in an untracked `src/DocumentInvite.Web/.env.local`.
 
 Example for a second instance:
 
 ```bash
 ASPNETCORE_URLS=http://localhost:5301 dotnet run --project src/DocumentInvite.Api
-VITE_PORT=5174 VITE_API_BASE_URL=http://localhost:5301 npm run dev
+VITE_PORT=5174 VITE_API_PROXY_TARGET=http://localhost:5301 npm run dev
 ```
 
 ## Audit trail database permissions
