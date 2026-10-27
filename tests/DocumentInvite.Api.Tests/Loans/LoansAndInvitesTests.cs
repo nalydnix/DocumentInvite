@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests.Loans;
 
-public partial class LoansAndInvitesTests(SqlServerFixture sql) : StaffTestBase(sql)
+public partial class LoansAndInvitesTests : StaffTestBase
 {
     private sealed class TestClock : TimeProvider
     {
