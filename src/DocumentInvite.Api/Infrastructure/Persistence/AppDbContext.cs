@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
+    public DbSet<Contact> Contacts => Set<Contact>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -63,6 +64,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.FieldType).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => new { x.TemplateId, x.SortOrder });
+        });
+
+        modelBuilder.Entity<Contact>(e =>
+        {
+            e.ToTable("Contacts");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.LastName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(256).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(30);
+            e.Property(x => x.PartyType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => new { x.LastName, x.FirstName });
+            e.HasIndex(x => x.Email);
         });
 
         modelBuilder.Entity<AuditEvent>(e =>

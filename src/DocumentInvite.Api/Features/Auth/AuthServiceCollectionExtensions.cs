@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Domain;
+using DocumentInvite.Api.Features.Contacts;
 using DocumentInvite.Api.Features.Users;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
@@ -57,6 +58,7 @@ public static class AuthServiceCollectionExtensions
 
         services.AddHostedService<AdminBootstrapper>();
         services.AddUserAdmin();
+        services.AddContacts();
         return services;
     }
 
