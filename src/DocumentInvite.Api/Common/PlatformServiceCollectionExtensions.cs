@@ -1,6 +1,7 @@
 using DocumentInvite.Api.Common.Errors;
 using DocumentInvite.Api.Common.Logging;
 using DocumentInvite.Api.Common.Validation;
+using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -41,12 +42,14 @@ public static class PlatformServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
         services.AddScoped<IRequestContext, HttpRequestContext>();
+        services.AddAudit();
 
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("Default")
                 ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
             options.UseSqlServer(connectionString);
+            options.AddInterceptors(sp.GetRequiredService<AuditImmutabilityInterceptor>());
         });
 
         services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>

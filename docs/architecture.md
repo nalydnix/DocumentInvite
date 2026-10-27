@@ -98,11 +98,11 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 
 ## 7. Audit trail
 
-- **Model**: the `AuditEvent` table described in §4. Details hold only ids, enum values and counts. They never hold names, emails, file names or field values. A typed `IAuditLog.Record(action, target, details)` API is the only way to write events, so the rule can be reviewed in one place.
+- **Model**: the `AuditEvent` table described in §4. Details hold only ids, enum values and counts. They never hold names, emails, file names or field values. A typed `IAuditLog.RecordAsync(action, target, details)` API (details are built with `AuditDetails`, which accepts only ids, enum values and counts) is the only way to write events, so the rule can be reviewed in one place.
 - **Hash chain**: `Hash = SHA256(PrevHash || canonical JSON of the event fields)`. The first event uses a fixed genesis hash. Appends are serialised with an application lock (`sp_getapplock`) inside the transaction, so the chain cannot fork under concurrent writes. "Verify integrity" (Admin or Auditor) walks the chain and reports the first broken id, and the check itself is audited.
 - **Append-only enforcement**:
   - An EF Core `SaveChangesInterceptor` throws if any `AuditEvent` entry is Modified or Deleted.
-  - The database has a dedicated role `audit_writer` with only `INSERT` and `SELECT` on `AuditEvents`. The application's runtime database user is denied `UPDATE` and `DELETE` on that table, through a migration with raw SQL. Migrations run under a separate, privileged identity.
+  - The database has a dedicated role `audit_writer` with only `INSERT` and `SELECT` on `AuditEvents`, and `UPDATE` and `DELETE` are denied to it. The application's runtime database user must be a member of this role, so it is denied `UPDATE` and `DELETE` on that table, through a migration with raw SQL. Migrations run under a separate, privileged identity.
   - Erasure and the retention purge never touch audit rows. Because events hold ids only, the chain stays valid after pseudonymisation.
 - **Read events**: previews, downloads, exports, portal opens, sign-in success and failure, role and settings changes, user access-expiry changes, job runs, integrity checks, GDPR exports and erasures, and demo resets.
 - **Capture**: middleware sets the correlation id (from the `X-Correlation-Id` header, or a new one) and makes the actor, IP and user agent available through `IAuditContext`.

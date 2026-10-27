@@ -53,3 +53,7 @@ Example for a second instance:
 ASPNETCORE_URLS=http://localhost:5301 dotnet run --project src/DocumentInvite.Api
 VITE_PORT=5174 VITE_API_BASE_URL=http://localhost:5301 npm run dev
 ```
+
+## Audit trail database permissions
+
+Migrations create the `audit_writer` database role: `SELECT` and `INSERT` are granted and `UPDATE` and `DELETE` are denied on `dbo.AuditEvents`. Add the runtime application database user to this role (`ALTER ROLE audit_writer ADD MEMBER [app_user]`). The DENY overrides broader grants such as `db_datawriter`. Run migrations under a separate privileged identity (`ConnectionStrings:Migrations`).
