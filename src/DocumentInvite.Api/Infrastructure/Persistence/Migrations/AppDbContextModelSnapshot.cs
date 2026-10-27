@@ -376,6 +376,41 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("Invites", (string)null);
                 });
 
+            modelBuilder.Entity("DocumentInvite.Api.Domain.JobRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("JobName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("WindowKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobName", "WindowKey")
+                        .IsUnique();
+
+                    b.ToTable("JobRuns", (string)null);
+                });
+
             modelBuilder.Entity("DocumentInvite.Api.Domain.Loan", b =>
                 {
                     b.Property<Guid>("Id")

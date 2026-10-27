@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
-import { ErrorList, Field, primaryButtonClass } from '../components/Field';
+import { ErrorList, Field, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
 
 interface Settings {
@@ -70,6 +70,49 @@ function SettingsForm({ settings }: { settings: Settings }) {
   );
 }
 
+interface ReminderRun {
+  windowKey: string;
+  alreadyRan: boolean;
+  invitesDue: number;
+  remindersSent: number;
+  overdueNoticesSent: number;
+  failed: number;
+}
+
+function plural(count: number, word: string) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+function RunRemindersPanel() {
+  const run = useMutation({
+    mutationFn: () => apiFetch<ReminderRun>('/api/jobs/reminders/run', { method: 'POST' }),
+  });
+  const result = run.data;
+
+  return (
+    <div className="space-y-3">
+      <p>
+        Reminders and overdue notices are sent automatically every hour. Run the same job now to send any that are due.
+        Each party is emailed at most once per reminder interval, so running it again does nothing new.
+      </p>
+      <ErrorList messages={messagesOf(run.error)} />
+      {result && (
+        <div role="status" className="rounded-md bg-surface-muted p-3 text-sm text-ink">
+          <p className="font-medium">Reminder job finished.</p>
+          <ul className="mt-1 list-disc pl-5">
+            <li>{plural(result.remindersSent, 'reminder')} sent</li>
+            <li>{plural(result.overdueNoticesSent, 'overdue notice')} sent</li>
+            <li>{result.failed} failed</li>
+          </ul>
+        </div>
+      )}
+      <button type="button" disabled={run.isPending} onClick={() => run.mutate()} className={secondaryButtonClass}>
+        {run.isPending ? 'Running...' : 'Run reminders now'}
+      </button>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => apiFetch<Settings>('/api/settings') });
 
@@ -83,6 +126,9 @@ export function SettingsPage() {
           <SettingsForm settings={settings.data} />
         </Card>
       )}
+      <Card title="Reminder job">
+        <RunRemindersPanel />
+      </Card>
     </div>
   );
 }
