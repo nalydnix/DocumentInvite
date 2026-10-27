@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Common;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Features.Invites;
@@ -18,7 +19,7 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
 {
     private const string DuplicateReference = "A loan with this reference already exists.";
 
-    public async Task<LoanPage> ListAsync(LoanListQuery query, CancellationToken ct)
+    public async Task<PagedResponse<LoanSummaryResponse>> ListAsync(LoanListQuery query, CancellationToken ct)
     {
         var loans = db.Loans.AsNoTracking();
 
@@ -39,17 +40,10 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
             }
         }
 
-        var total = await loans.CountAsync(ct);
-        var items = await loans
-            .OrderByDescending(l => l.CreatedAt).ThenBy(l => l.Id)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .Select(l => new LoanSummaryResponse(
-                l.Id, l.Reference, l.Name, l.Amount, l.LoanType, l.Status, l.CreatedAt, l.CompletedAt,
-                l.Invites.Count))
-            .ToListAsync(ct);
-
-        return new LoanPage(items, total, query.Page, query.PageSize);
+        return await loans
+            .Select(l => new { Loan = l, Parties = l.Invites.Count })
+            .OrderByDescending(x => x.Loan.CreatedAt).ThenBy(x => x.Loan.Id)
+            .ToPagedResponseAsync(query, x => ToSummary(x.Loan, x.Parties), ct);
     }
 
     public async Task<LoanResult> GetAsync(Guid id, CancellationToken ct)
@@ -100,6 +94,9 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
 
         return LoanResult.Ok(ToResponse(loan, new Dictionary<Guid, Contact>()));
     }
+
+    private static LoanSummaryResponse ToSummary(Loan l, int partyCount) => new(
+        l.Id, l.Reference, l.Name, l.Amount, l.LoanType, l.Status, l.CreatedAt, l.CompletedAt, partyCount);
 
     private static string EscapeLike(string term) =>
         term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");

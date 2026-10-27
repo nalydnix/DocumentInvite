@@ -2,17 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { hasAnyRole, useAuth } from '../auth/AuthContext';
-import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from '../components/Field';
+import { ErrorList, inputClass, primaryButtonClass } from '../components/Field';
+import { Pagination } from '../components/Pagination';
 import { StatusBadge } from '../components/StatusBadge';
 import { ApiError, apiFetch } from '../lib/api';
+import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 import {
   formatAmount,
-  LOANS_PAGE_SIZE,
   LOAN_WRITER_ROLES,
   STATUSES,
   STATUS_LABELS,
   type CollectionStatus,
-  type LoanPage,
   type LoanSummary,
 } from './loans';
 
@@ -47,26 +47,22 @@ export function LoansPage() {
   const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, LOAN_WRITER_ROLES);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CollectionStatus | ''>('');
-  // The page belongs to the filter it was chosen for, so a new filter starts on page 1.
+  const paging = usePaging();
   const term = useDebounced(search.trim(), 250);
-  const filterKey = `${term}|${status}`;
-  const [pageFor, setPageFor] = useState({ key: '', page: 1 });
-  const page = pageFor.key === filterKey ? pageFor.page : 1;
-  const setPage = (update: (p: number) => number) => setPageFor({ key: filterKey, page: update(page) });
 
   const loans = useQuery({
-    queryKey: ['loans', term, status, page],
+    queryKey: ['loans', term, status, paging.page, paging.pageSize],
     queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(LOANS_PAGE_SIZE) });
+      const params = paging.params();
       if (term) params.set('search', term);
       if (status) params.set('status', status);
-      return apiFetch<LoanPage>(`/api/loans?${params}`);
+      return apiFetch<PagedResponse<LoanSummary>>(`/api/loans?${params}`);
     },
     placeholderData: keepPreviousData,
   });
 
   const data = loans.data;
-  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  useClampPage(paging, data?.total);
   const filtered = term !== '' || status !== '';
 
   return (
@@ -88,7 +84,10 @@ export function LoansPage() {
             className={inputClass}
             placeholder="Reference, name or loan type"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              paging.resetPage();
+            }}
           />
         </label>
         <label className="block text-sm font-medium text-ink">
@@ -96,7 +95,10 @@ export function LoansPage() {
           <select
             className={inputClass}
             value={status}
-            onChange={(e) => setStatus(e.target.value as CollectionStatus | '')}
+            onChange={(e) => {
+              setStatus(e.target.value as CollectionStatus | '');
+              paging.resetPage();
+            }}
           >
             <option value="">All statuses</option>
             {STATUSES.map((s) => (
@@ -123,28 +125,14 @@ export function LoansPage() {
         </ul>
       )}
 
-      {data && pageCount > 1 && (
-        <nav aria-label="Pagination" className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
-          </button>
-          <span className="text-sm text-ink-muted">
-            Page {data.page} of {pageCount}
-          </span>
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </nav>
+      {data && (
+        <Pagination
+          page={paging.page}
+          pageSize={paging.pageSize}
+          total={data.total}
+          onPageChange={paging.setPage}
+          onPageSizeChange={paging.setPageSize}
+        />
       )}
     </div>
   );

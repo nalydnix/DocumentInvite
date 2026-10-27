@@ -26,12 +26,6 @@ export interface LoanSummary {
   partyCount: number;
 }
 
-export interface LoanPage {
-  items: LoanSummary[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
 
 export interface InviteItem {
   id: string;
@@ -64,8 +58,6 @@ export interface Invite {
 export interface Loan extends Omit<LoanSummary, 'partyCount'> {
   invites: Invite[];
 }
-
-export const LOANS_PAGE_SIZE = 20;
 
 /** Roles that may create loans and send, revoke and reissue invites (the viewer role is read-only). */
 export const LOAN_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;

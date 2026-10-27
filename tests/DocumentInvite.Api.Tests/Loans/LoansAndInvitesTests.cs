@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Contacts;
@@ -145,7 +146,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
 
         var created = await CreateLoanAsync(client);
         var fetched = await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{created.Id}");
-        var page = await client.GetFromJsonAsync<LoanPage>("/api/loans");
+        var page = await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans");
 
         fetched!.Reference.Should().Be("LN-1001");
         fetched.Name.Should().Be("Acme acquisition");
@@ -164,10 +165,32 @@ public partial class LoansAndInvitesTests : StaffTestBase
         await CreateLoanAsync(client, ValidLoan("AAA-1"));
         await CreateLoanAsync(client, ValidLoan("BBB-2"));
 
-        (await client.GetFromJsonAsync<LoanPage>("/api/loans?search=bbb"))!.Items.Select(l => l.Reference)
+        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?search=bbb"))!.Items.Select(l => l.Reference)
             .Should().Equal("BBB-2");
-        (await client.GetFromJsonAsync<LoanPage>("/api/loans?status=Completed"))!.Total.Should().Be(0);
-        (await client.GetFromJsonAsync<LoanPage>("/api/loans?status=Sent"))!.Total.Should().Be(2);
+        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?status=Completed"))!.Total.Should().Be(0);
+        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?status=Sent"))!.Total.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task The_list_uses_the_shared_paging_contract()
+    {
+        var client = await OfficerAsync();
+        foreach (var n in new[] { "A-1", "A-2", "A-3" })
+        {
+            await CreateLoanAsync(client, ValidLoan(n));
+        }
+
+        var defaults = (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!;
+        var page2 = (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?page=2&pageSize=2"))!;
+
+        defaults.PageSize.Should().Be(25);
+        page2.Total.Should().Be(3);
+        page2.Page.Should().Be(2);
+        page2.Items.Should().HaveCount(1);
+        foreach (var bad in new[] { "page=0", "pageSize=0", "pageSize=101" })
+        {
+            (await client.GetAsync($"/api/loans?{bad}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
     }
 
     [Fact]
@@ -238,7 +261,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
         var detail = await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{loan.Id}");
         detail!.Status.Should().Be(CollectionStatus.Sent);
         detail.Invites.Should().HaveCount(2);
-        (await client.GetFromJsonAsync<LoanPage>("/api/loans"))!.Items.Single().PartyCount.Should().Be(2);
+        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!.Items.Single().PartyCount.Should().Be(2);
     }
 
     [Fact]

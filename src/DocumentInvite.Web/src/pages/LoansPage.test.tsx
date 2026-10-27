@@ -63,7 +63,7 @@ const annInvite: Invite = {
 
 const loan: Loan = { ...summary, invites: [annInvite] };
 
-const page = (items: LoanSummary[], total = items.length) => ({ items, total, page: 1, pageSize: 20 });
+const page = (items: LoanSummary[], total = items.length) => ({ items, total, page: 1, pageSize: 25 });
 
 function signedIn(roles: Role[]) {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
@@ -88,7 +88,7 @@ describe('LoansPage', () => {
   it('lists loans with status and a create link for writers', async () => {
     mockApi({
       ...signedIn(['LoanOfficer']),
-      'GET /api/loans?page=1&pageSize=20': () => jsonResponse(200, page([summary])),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
     });
 
     renderRoutes('/loans');
@@ -103,7 +103,7 @@ describe('LoansPage', () => {
   it('hides the create link from a viewer', async () => {
     mockApi({
       ...signedIn(['Viewer']),
-      'GET /api/loans?page=1&pageSize=20': () => jsonResponse(200, page([summary])),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
     });
 
     renderRoutes('/loans');
@@ -115,8 +115,8 @@ describe('LoansPage', () => {
   it('filters by status', async () => {
     const { calls } = mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans?page=1&pageSize=20': () => jsonResponse(200, page([summary])),
-      'GET /api/loans?page=1&pageSize=20&status=Completed': () => jsonResponse(200, page([])),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
+      'GET /api/loans?page=1&pageSize=25&status=Completed': () => jsonResponse(200, page([])),
     });
     renderRoutes('/loans');
     const user = userEvent.setup();
@@ -127,10 +127,41 @@ describe('LoansPage', () => {
     expect(calls.some((c) => c.key.endsWith('status=Completed'))).toBe(true);
   });
 
+  it('pages through results using the shared pagination', async () => {
+    mockApi({
+      ...signedIn(['Admin']),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, { items: [summary], total: 26, page: 1, pageSize: 25 }),
+      'GET /api/loans?page=2&pageSize=25': () =>
+        jsonResponse(200, { items: [{ ...summary, id: 'l2', reference: 'LN-2002' }], total: 26, page: 2, pageSize: 25 }),
+    });
+    renderRoutes('/loans');
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByText(/LN-2002/)).toBeInTheDocument();
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+  });
+
+  it('returns to page 1 when the status filter changes', async () => {
+    const { calls } = mockApi({
+      ...signedIn(['Admin']),
+      'GET /api/loans?page=2&pageSize=25': () => jsonResponse(200, { items: [summary], total: 30, page: 2, pageSize: 25 }),
+      'GET /api/loans?page=1&pageSize=25&status=Sent': () => jsonResponse(200, page([summary])),
+    });
+    renderRoutes('/loans?page=2');
+    const user = userEvent.setup();
+
+    await user.selectOptions(await screen.findByLabelText('Status'), 'Sent');
+
+    await waitFor(() => expect(calls.some((c) => c.key === 'GET /api/loans?page=1&pageSize=25&status=Sent')).toBe(true));
+  });
+
   it('says so when there are no loans', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans?page=1&pageSize=20': () => jsonResponse(200, page([])),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
 
     renderRoutes('/loans');
@@ -255,7 +286,7 @@ describe('LoanDetailPage', () => {
         revoked = true;
         return jsonResponse(200, { ...annInvite, revokedAt: '2027-01-06T00:00:00Z' });
       },
-      'GET /api/loans?page=1&pageSize=20': () => jsonResponse(200, page([])),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
     renderRoutes('/loans/l1');
     const user = userEvent.setup();
@@ -285,7 +316,7 @@ describe('LoanDetailPage', () => {
     const { calls } = mockApi({
       ...routes(['LoanOfficer'], { ...loan, invites: [] }),
       'POST /api/loans/l1/invites': () => jsonResponse(201, [annInvite]),
-      'GET /api/loans?page=1&pageSize=20': () => jsonResponse(200, page([])),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
     renderRoutes('/loans/l1');
     const user = userEvent.setup();
