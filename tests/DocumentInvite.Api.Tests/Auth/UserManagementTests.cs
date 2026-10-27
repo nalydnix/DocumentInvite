@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Users;
 using DocumentInvite.Api.Tests.Infrastructure;
@@ -37,13 +38,88 @@ public class UserManagementTests : StaffTestBase
         var expiry = DateTimeOffset.UtcNow.AddDays(10);
         await CreateUserAsync("aud@example.com", [StaffRoles.Auditor], expiry);
 
-        var users = await admin.GetFromJsonAsync<List<UserResponse>>("/api/users");
+        var users = await admin.GetFromJsonAsync<PagedResponse<UserResponse>>("/api/users");
 
-        users.Should().HaveCount(2);
-        var auditor = users!.Single(u => u.Email == "aud@example.com");
+        users!.Items.Should().HaveCount(2);
+        users.Total.Should().Be(2);
+        var auditor = users.Items.Single(u => u.Email == "aud@example.com");
         auditor.Roles.Should().BeEquivalentTo(StaffRoles.Auditor);
         auditor.AccessExpiresAt.Should().BeCloseTo(expiry, TimeSpan.FromSeconds(1));
         auditor.IsLockedOut.Should().BeFalse();
+    }
+
+
+    private async Task CreateManyAsync(HttpClient admin, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            (await admin.PostAsJsonAsync("/api/users", NewUser($"user{i:00}@example.com", [StaffRoles.Viewer])))
+                .EnsureSuccessStatusCode();
+        }
+    }
+
+    [Fact]
+    public async Task The_user_list_defaults_to_page_one_of_25_in_email_order()
+    {
+        var admin = await AdminClientAsync();
+        await CreateManyAsync(admin, 29); // plus the admin: 30 users
+
+        var body = (await admin.GetFromJsonAsync<PagedResponse<UserResponse>>("/api/users"))!;
+
+        body.Page.Should().Be(1);
+        body.PageSize.Should().Be(25);
+        body.Total.Should().Be(30);
+        body.Items.Should().HaveCount(25);
+        body.Items.Select(u => u.Email).Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);
+        body.Items.Should().OnlyContain(u => u.Roles.Count > 0);
+    }
+
+    [Fact]
+    public async Task The_last_partial_page_holds_the_remaining_users_and_pages_do_not_overlap()
+    {
+        var admin = await AdminClientAsync();
+        await CreateManyAsync(admin, 6); // plus the admin: 7 users
+
+        var seen = new List<Guid>();
+        foreach (var page in new[] { 1, 2, 3 })
+        {
+            var body = (await admin.GetFromJsonAsync<PagedResponse<UserResponse>>($"/api/users?page={page}&pageSize=3"))!;
+            body.Total.Should().Be(7);
+            body.Items.Should().HaveCount(page == 3 ? 1 : 3);
+            body.Items.Should().OnlyContain(u => u.Roles.Count > 0);
+            seen.AddRange(body.Items.Select(u => u.Id));
+        }
+
+        seen.Should().HaveCount(7).And.OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task A_user_page_past_the_end_is_empty_but_reports_the_total()
+    {
+        var admin = await AdminClientAsync();
+
+        var body = (await admin.GetFromJsonAsync<PagedResponse<UserResponse>>("/api/users?page=9&pageSize=5"))!;
+
+        body.Items.Should().BeEmpty();
+        body.Total.Should().Be(1);
+        body.Page.Should().Be(9);
+        body.PageSize.Should().Be(5);
+    }
+
+    [Theory]
+    [InlineData("page=0")]
+    [InlineData("page=-1")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=101")]
+    [InlineData("page=abc")]
+    public async Task Invalid_user_paging_returns_a_validation_problem(string query)
+    {
+        var admin = await AdminClientAsync();
+
+        var response = await admin.GetAsync($"/api/users?{query}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
     }
 
     [Fact]
@@ -208,9 +284,9 @@ public class UserManagementTests : StaffTestBase
         }
 
         var admin = await AdminClientAsyncFor("root@example.com", "Bootstrap-Pass-12");
-        var users = await admin.GetFromJsonAsync<List<UserResponse>>("/api/users");
-        users.Should().ContainSingle();
-        users![0].Roles.Should().BeEquivalentTo(StaffRoles.Admin);
+        var users = await admin.GetFromJsonAsync<PagedResponse<UserResponse>>("/api/users");
+        users!.Items.Should().ContainSingle();
+        users.Items[0].Roles.Should().BeEquivalentTo(StaffRoles.Admin);
     }
 
     private async Task<HttpClient> AdminClientAsyncFor(string email, string password)

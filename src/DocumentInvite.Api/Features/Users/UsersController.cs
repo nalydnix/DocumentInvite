@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Common.Errors;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,8 @@ namespace DocumentInvite.Api.Features.Users;
 public class UsersController(UserAdminService service) : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<UserResponse>> List(CancellationToken ct) => await service.ListAsync(ct);
+    public async Task<PagedResponse<UserResponse>> List([FromQuery] PageQuery query, CancellationToken ct) =>
+        await service.ListAsync(query, ct);
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id) => ToActionResult(await service.GetAsync(id));
