@@ -16,6 +16,8 @@ export const navItems: NavItem[] = [
   { to: '/outbox', label: 'Outbox', roles: ['Admin', 'LoanOfficer'] },
   { to: '/contacts', label: 'Contacts', roles: ['Admin', 'LoanOfficer', 'Viewer'] },
   { to: '/users', label: 'Users', roles: ['Admin'] },
+  { to: '/audit', label: 'Audit log', roles: ['Admin', 'Auditor'] },
+  { to: '/settings', label: 'Settings', roles: ['Admin'] },
 ];
 
 function NavLinks({ user, onNavigate }: { user: CurrentUser; onNavigate?: () => void }) {

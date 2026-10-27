@@ -152,15 +152,15 @@ function send(path: string, method: string, body: unknown): Promise<Response> {
 
 /**
  * Calls the API as the signed-in user. A 401 triggers one token refresh and one retry; if that
- * fails the session ends and listeners (the auth provider) are told.
+ * fails the session ends and listeners (the auth provider) are told. Throws an ApiError for any
+ * non-success status.
  */
-export async function apiFetch<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
-  const method = options.method ?? 'GET';
+async function apiRequest(path: string, method: string, body?: unknown): Promise<Response> {
   const hadSession = accessToken !== null || hasStoredSession();
 
-  let response = await send(path, method, options.body);
+  let response = await send(path, method, body);
   if (response.status === 401 && hadSession && (await refreshSession())) {
-    response = await send(path, method, options.body);
+    response = await send(path, method, body);
   }
 
   if (response.status === 401 && hadSession) {
@@ -169,5 +169,15 @@ export async function apiFetch<T>(path: string, options: { method?: string; body
   }
 
   if (!response.ok) throw await toApiError(response);
+  return response;
+}
+
+export async function apiFetch<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+  const response = await apiRequest(path, options.method ?? 'GET', options.body);
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+}
+
+/** Downloads a file from the API as the signed-in user. */
+export async function apiDownload(path: string): Promise<Blob> {
+  return (await apiRequest(path, 'GET')).blob();
 }
