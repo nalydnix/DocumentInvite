@@ -6,86 +6,145 @@ using Testcontainers.MsSql;
 namespace DocumentInvite.Api.Tests.Infrastructure;
 
 /// <summary>
-/// Provides a SQL Server instance for integration tests. When <c>TEST_SQL_CONNECTION</c> is set
-/// (for example a CI service container or LocalDB) that server is used; otherwise a SQL Server
-/// container is started with Testcontainers. Every call to <see cref="CreateDatabaseAsync"/>
-/// returns a fresh, migrated database.
+/// Process-wide SQL Server for integration tests, started lazily and shared by every test class.
+/// When <c>TEST_SQL_CONNECTION</c> is set (for example a CI service container or LocalDB) that
+/// server is used; otherwise a SQL Server container is started with Testcontainers (removed by
+/// its resource reaper when the test process ends).
+/// A template database is migrated and backed up once; <see cref="CreateDatabaseAsync"/> restores
+/// a private copy from that backup, so no class pays for migrations.
 /// </summary>
-public sealed class SqlServerFixture : IAsyncLifetime
+public static class SqlServerFixture
 {
     public const string ConnectionVariable = "TEST_SQL_CONNECTION";
 
-    private readonly List<string> _databases = [];
-    private MsSqlContainer? _container;
-    private string _serverConnectionString = string.Empty;
+    private static readonly Lazy<Task<ServerState>> State = new(StartAsync, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    public async Task InitializeAsync()
+    public static async Task<string> CreateDatabaseAsync()
     {
+        var state = await State.Value;
+        var name = $"DocumentInviteTests_{Guid.NewGuid():N}";
+
+        var moves = string.Join(", ", state.Files.Select((f, i) =>
+            $"MOVE N'{f.LogicalName}' TO N'{state.DataPath}{name}_{i}{(f.IsLog ? ".ldf" : ".mdf")}'"));
+
+        await ExecuteAsync(
+            state.ServerConnectionString,
+            $"RESTORE DATABASE [{name}] FROM DISK = N'{state.BackupFile}' WITH {moves}");
+
+        return new SqlConnectionStringBuilder(state.ServerConnectionString) { InitialCatalog = name }.ConnectionString;
+    }
+
+    public static async Task DropDatabaseAsync(string connectionString)
+    {
+        var state = await State.Value;
+        var name = new SqlConnectionStringBuilder(connectionString).InitialCatalog;
+        try
+        {
+            await ExecuteAsync(
+                state.ServerConnectionString,
+                $"IF DB_ID(N'{name}') IS NOT NULL BEGIN ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]; END");
+        }
+        catch (SqlException)
+        {
+            // Best-effort cleanup; a container is discarded anyway.
+        }
+    }
+
+    private static async Task<ServerState> StartAsync()
+    {
+        string serverConnectionString;
         var external = Environment.GetEnvironmentVariable(ConnectionVariable);
         if (!string.IsNullOrWhiteSpace(external))
         {
-            _serverConnectionString = external;
-            return;
+            serverConnectionString = external;
+        }
+        else
+        {
+            var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+            await container.StartAsync();
+            serverConnectionString = container.GetConnectionString();
         }
 
-        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await _container.StartAsync();
-        _serverConnectionString = _container.GetConnectionString();
-    }
+        var template = $"DocumentInviteTemplate_{Guid.NewGuid():N}";
 
-    public async Task<string> CreateDatabaseAsync()
-    {
-        var name = $"DocumentInviteTests_{Guid.NewGuid():N}";
-        _databases.Add(name);
-
-        await using (var connection = new SqlConnection(_serverConnectionString))
+        string backupPath, dataPath;
+        await using (var connection = new SqlConnection(serverConnectionString))
         {
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
-            command.CommandText = $"CREATE DATABASE [{name}]";
-            await command.ExecuteNonQueryAsync();
+            command.CommandText =
+                "SELECT CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(512)), " +
+                "CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(512))";
+            await using var reader = await command.ExecuteReaderAsync();
+            await reader.ReadAsync();
+            backupPath = WithTrailingSeparator(reader.GetString(0));
+            dataPath = WithTrailingSeparator(reader.GetString(1));
         }
 
-        var connectionString = new SqlConnectionStringBuilder(_serverConnectionString) { InitialCatalog = name }.ConnectionString;
+        var backupFile = $"{backupPath}{template}.bak";
 
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connectionString).Options;
-        await using var db = new AppDbContext(options);
-        await db.Database.MigrateAsync();
+        await ExecuteAsync(serverConnectionString, $"CREATE DATABASE [{template}]");
+        try
+        {
+            var templateConnection = new SqlConnectionStringBuilder(serverConnectionString) { InitialCatalog = template }.ConnectionString;
+            var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(templateConnection).Options;
+            await using (var db = new AppDbContext(options))
+            {
+                await db.Database.MigrateAsync();
+            }
 
-        return connectionString;
+            await ExecuteAsync(serverConnectionString, $"BACKUP DATABASE [{template}] TO DISK = N'{backupFile}' WITH INIT, FORMAT");
+        }
+        finally
+        {
+            await ExecuteAsync(
+                serverConnectionString,
+                $"ALTER DATABASE [{template}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{template}]");
+        }
+
+        var files = await ReadFilesAsync(serverConnectionString, backupFile);
+        return new ServerState(serverConnectionString, backupFile, dataPath, files);
     }
 
-    public async Task DisposeAsync()
+    private static string WithTrailingSeparator(string path)
     {
-        if (_databases.Count > 0)
+        if (path.EndsWith('/') || path.EndsWith('\\'))
         {
-            try
-            {
-                await using var connection = new SqlConnection(_serverConnectionString);
-                await connection.OpenAsync();
-                foreach (var name in _databases)
-                {
-                    await using var command = connection.CreateCommand();
-                    command.CommandText =
-                        $"ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]";
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
-            catch (SqlException)
-            {
-                // Best-effort cleanup; a container is discarded anyway.
-            }
+            return path;
         }
 
-        if (_container is not null)
-        {
-            await _container.DisposeAsync();
-        }
+        return path + (path.Contains('/') && !path.Contains('\\') ? "/" : "\\");
     }
-}
 
-[CollectionDefinition(Name)]
-public sealed class SqlServerCollection : ICollectionFixture<SqlServerFixture>
-{
-    public const string Name = "SqlServer";
+    private static async Task ExecuteAsync(string connectionString, string sql)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.CommandTimeout = 180;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<List<LogicalFile>> ReadFilesAsync(string connectionString, string backupFile)
+    {
+        var files = new List<LogicalFile>();
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"RESTORE FILELISTONLY FROM DISK = N'{backupFile}'";
+        await using var reader = await command.ExecuteReaderAsync();
+        var nameOrdinal = reader.GetOrdinal("LogicalName");
+        var typeOrdinal = reader.GetOrdinal("Type");
+        while (await reader.ReadAsync())
+        {
+            files.Add(new LogicalFile(reader.GetString(nameOrdinal), reader.GetString(typeOrdinal) == "L"));
+        }
+
+        return files;
+    }
+
+    private sealed record LogicalFile(string LogicalName, bool IsLog);
+
+    private sealed record ServerState(string ServerConnectionString, string BackupFile, string DataPath, List<LogicalFile> Files);
 }

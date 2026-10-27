@@ -7,7 +7,7 @@ using FluentAssertions;
 
 namespace DocumentInvite.Api.Tests.Auth;
 
-public class AuthorizationTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class AuthorizationTests : StaffTestBase
 {
     // Role -> the probe endpoints that role may call (architecture section 5).
     public static TheoryData<string, string, bool> Matrix()

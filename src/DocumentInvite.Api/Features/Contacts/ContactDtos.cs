@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using FluentValidation;
 
@@ -13,10 +14,11 @@ public sealed record ContactResponse(
     PartyType PartyType,
     bool IsPseudonymised);
 
-public sealed record ContactPage(IReadOnlyList<ContactResponse> Items, int Total, int Page, int PageSize);
-
 /// <summary>Query-string parameters for the contact list.</summary>
-public sealed record ContactListQuery(string? Search, int Page = 1, int PageSize = 20);
+public sealed record ContactListQuery(
+    string? Search,
+    int Page = PagingDefaults.DefaultPage,
+    int PageSize = PagingDefaults.DefaultPageSize) : IPagedQuery;
 
 public sealed record ContactRequest(
     string? FirstName,
@@ -27,12 +29,9 @@ public sealed record ContactRequest(
 
 public sealed class ContactListQueryValidator : AbstractValidator<ContactListQuery>
 {
-    public const int MaxPageSize = 100;
-
     public ContactListQueryValidator()
     {
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageSize).InclusiveBetween(1, MaxPageSize);
+        Include(new PagedQueryValidator<ContactListQuery>());
         RuleFor(x => x.Search).MaximumLength(200);
     }
 }

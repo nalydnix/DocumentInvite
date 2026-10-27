@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests.Audit;
 
-public class AuditIntegrationTests(SqlServerFixture sql) : IntegrationTestBase(sql)
+public class AuditIntegrationTests : IntegrationTestBase
 {
     private readonly List<string> _logins = [];
 

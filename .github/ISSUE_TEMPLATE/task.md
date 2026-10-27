@@ -2,7 +2,7 @@
 name: Task
 about: Technical work, infrastructure, configuration, or refactoring
 title: ''
-labels: task, status:todo
+labels: task, status:backlog
 assignees: ''
 ---
 

@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentInvite.Api.Tests.Auth;
 
-public class AuthenticationTests(SqlServerFixture sql) : StaffTestBase(sql)
+public class AuthenticationTests : StaffTestBase
 {
     private sealed record MeBody(Guid Id, string Email, string DisplayName, string[] Roles, DateTimeOffset? AccessExpiresAt);
 

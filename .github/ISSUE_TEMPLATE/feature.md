@@ -2,7 +2,7 @@
 name: Feature / User Story
 about: New functionality or a user story
 title: ''
-labels: feature, status:todo
+labels: feature, status:backlog
 assignees: ''
 ---
 
