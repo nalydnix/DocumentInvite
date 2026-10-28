@@ -27,6 +27,9 @@ public sealed class PortalOptions
 {
     public const string Section = "Portal";
 
-    /// <summary>The web app origin that portal links point at.</summary>
-    public string BaseUrl { get; set; } = "http://localhost:5173";
+    /// <summary>
+    /// The web app origin that portal links point at (<c>Portal__BaseUrl</c>). Set per instance; there is no default
+    /// because the web port varies (see the README's side-by-side section).
+    /// </summary>
+    public string BaseUrl { get; set; } = string.Empty;
 }

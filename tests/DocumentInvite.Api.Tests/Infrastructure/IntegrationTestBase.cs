@@ -12,6 +12,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 {
     private WebApplicationFactory<Program>? _factory;
 
+    protected const string PortalBaseUrl = "https://web.test.example";
+
     protected string ConnectionString { get; private set; } = string.Empty;
 
     protected WebApplicationFactory<Program> Factory => _factory!;
@@ -24,6 +26,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             builder.UseEnvironment("Production");
             builder.UseSetting("ConnectionStrings:Default", ConnectionString);
             builder.UseSetting("ConnectionStrings:Migrations", ConnectionString);
+            builder.UseSetting("Portal:BaseUrl", PortalBaseUrl);
             builder.ConfigureServices(ConfigureServices);
         });
     }
