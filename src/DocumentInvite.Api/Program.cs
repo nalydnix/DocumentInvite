@@ -10,6 +10,7 @@ using DocumentInvite.Api.Features.Portal;
 using DocumentInvite.Api.Features.Templates;
 using DocumentInvite.Api.Features.Outbox;
 using DocumentInvite.Api.Features.Reminders;
+using DocumentInvite.Api.Features.Export;
 using DocumentInvite.Api.Features.Review;
 using Scalar.AspNetCore;
 
@@ -25,6 +26,7 @@ builder.Services.AddReminders();
 builder.Services.AddFiles();
 builder.Services.AddPortal();
 builder.Services.AddReview();
+builder.Services.AddExport();
 builder.Services.AddDemo();
 builder.Services.AddMessaging();
 builder.Services.AddGdpr();

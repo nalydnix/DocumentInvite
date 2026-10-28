@@ -292,6 +292,42 @@ describe('LoanDetailPage', () => {
     expect(within(parties).getByText(/1 of 2 items approved/)).toBeInTheDocument();
   });
 
+  it('downloads the approved zip for a loan officer', async () => {
+    const createObjectURL = vi.fn(() => 'blob:x');
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const { calls } = mockApi({
+      ...routes(['LoanOfficer']),
+      'GET /api/loans/l1/export': () => new Response('zip', { status: 200 }),
+    });
+    renderRoutes('/loans/l1');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Download approved' }));
+
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+    expect(calls.some((c) => c.key === 'GET /api/loans/l1/export')).toBe(true);
+  });
+
+  it('explains when there is nothing approved to export', async () => {
+    mockApi({
+      ...routes(['Admin']),
+      'GET /api/loans/l1/export': () =>
+        jsonResponse(409, { title: 'Conflict', detail: 'This loan has no approved documents or answers to export yet.' }),
+    });
+    renderRoutes('/loans/l1');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Download approved' }));
+
+    expect(await screen.findByText(/no approved documents/)).toBeInTheDocument();
+  });
+
+  it('hides the export button from a viewer', async () => {
+    mockApi(routes(['Viewer']));
+    renderRoutes('/loans/l1');
+    await screen.findByText('Ann Lee');
+    expect(screen.queryByRole('button', { name: 'Download approved' })).not.toBeInTheDocument();
+  });
+
   it('shows a viewer the parties without any actions', async () => {
     mockApi(routes(['Viewer']));
 
