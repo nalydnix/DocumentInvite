@@ -4,11 +4,13 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { hasAnyRole, useAuth } from '../auth/AuthContext';
 import { ErrorList, inputClass, primaryButtonClass } from '../components/Field';
 import { Pagination } from '../components/Pagination';
+import { ProgressBar } from '../components/ProgressBar';
 import { StatusBadge } from '../components/StatusBadge';
 import { ApiError, apiFetch } from '../lib/api';
 import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 import {
   formatAmount,
+  formatDate,
   LOAN_WRITER_ROLES,
   STATUSES,
   STATUS_LABELS,
@@ -26,8 +28,9 @@ function useDebounced<T>(value: T, delayMs: number): T {
 }
 
 function LoanCard({ loan }: { loan: LoanSummary }) {
+  const label = `Progress for ${loan.reference}`;
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-surface-border bg-surface p-4 shadow-card">
+    <li className="grid gap-3 rounded-card border border-surface-border bg-surface p-4 shadow-card md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_auto] md:items-center">
       <div className="min-w-0">
         <Link to={`/loans/${loan.id}`} className="font-medium text-brand-700 hover:underline">
           {loan.reference} &middot; {loan.name}
@@ -37,7 +40,19 @@ function LoanCard({ loan }: { loan: LoanSummary }) {
           {loan.partyCount === 1 ? 'party' : 'parties'}
         </p>
       </div>
-      <StatusBadge status={loan.status} />
+      <div className="space-y-1">
+        <ProgressBar percent={loan.percentComplete} label={label} />
+        <p className="text-sm text-ink-muted">
+          {loan.percentComplete}% complete ({loan.itemsApproved} of {loan.itemsTotal} items approved)
+          {loan.dueDate && <> &middot; due {formatDate(loan.dueDate)}</>}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 md:justify-end">
+        {loan.isOverdue && (
+          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Overdue</span>
+        )}
+        <StatusBadge status={loan.status} />
+      </div>
     </li>
   );
 }

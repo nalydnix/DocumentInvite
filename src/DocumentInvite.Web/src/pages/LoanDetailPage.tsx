@@ -5,15 +5,12 @@ import { ErrorList, secondaryButtonClass } from '../components/Field';
 import { StatusBadge } from '../components/StatusBadge';
 import { ApiError, apiFetch } from '../lib/api';
 import { partyLabel } from './contacts';
-import { formatAmount, LOAN_WRITER_ROLES, type Invite, type Loan } from './loans';
+import { formatAmount, formatDate, LOAN_WRITER_ROLES, type Invite, type Loan } from './loans';
+import { ItemReview } from './ItemReview';
 import { SendInvitesPanel } from './SendInvitesPanel';
 
 function messagesOf(error: unknown): string[] {
   return error instanceof ApiError ? error.messages : error ? ['Something went wrong. Please try again.'] : [];
-}
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
 }
 
 function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) {
@@ -82,6 +79,11 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
           )}
         </div>
       )}
+      <ul className="space-y-3 rounded-lg bg-surface-muted p-3" aria-label={`Items for ${invite.partyName}`}>
+        {invite.items.map((item) => (
+          <ItemReview key={item.id} item={item} loanId={invite.loanId} canWrite={canWrite} />
+        ))}
+      </ul>
       <ErrorList messages={[...messagesOf(revoke.error), ...messagesOf(reissue.error)]} />
       {reissue.isSuccess && <p role="status" className="text-sm text-ink-muted">A new link was emailed. The old link no longer works.</p>}
     </li>
