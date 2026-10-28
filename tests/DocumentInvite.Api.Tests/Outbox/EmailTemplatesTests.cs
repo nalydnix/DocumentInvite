@@ -95,6 +95,18 @@ public class EmailTemplatesTests
         builder.For("a/b").Should().Be("https://app.example.com/p/a%2Fb");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("localhost:5173")]
+    public void Portal_links_require_an_absolute_base_url(string baseUrl)
+    {
+        var builder = new PortalLinkBuilder(Options.Create(new PortalOptions { BaseUrl = baseUrl }));
+
+        var act = () => builder.For("token");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Portal:BaseUrl*");
+    }
+
     [Fact]
     public void A_party_message_email_for_staff_encodes_names_and_links_to_the_loan_without_the_message_text()
     {

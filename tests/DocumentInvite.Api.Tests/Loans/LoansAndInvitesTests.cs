@@ -276,7 +276,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
 
         var emails = await EmailsAsync();
         emails.Select(e => e.To).Should().BeEquivalentTo("ann@example.com", "bob@example.com");
-        emails.Should().OnlyContain(e => e.TextBody.Contains("http://localhost:5173/p/") && e.HtmlBody.Contains("/p/"));
+        emails.Should().OnlyContain(e => e.TextBody.Contains(PortalBaseUrl + "/p/") && e.HtmlBody.Contains("/p/"));
         TokenIn(emails[0]).Should().NotBe(TokenIn(emails[1]));
     }
 
