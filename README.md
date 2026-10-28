@@ -24,6 +24,10 @@ Uploads go straight from the browser to Azure Blob Storage with a write-only SAS
 
 Browser `PUT` uploads need a CORS rule on the storage account's Blob service. In development the browser only talks to the API through the dev proxy, but direct uploads go to the storage endpoint, so configure the rule for the web origin:
 
+**Local development (Azurite).** Nothing else provisions the rule, so the API sets it on Azurite's Blob service at startup. It allows the web origin from `Portal__BaseUrl` (the same setting the e-mail links use, so any web port works, for example `Portal__BaseUrl=http://localhost:5174`), plus any origins listed in `Blob__CorsAllowedOrigins__0` and so on. The rule is: methods `PUT`, `GET`, `HEAD`, `OPTIONS`; headers `x-ms-*` and `content-type`; exposed headers `ETag` and `x-ms-*`. If `Portal__BaseUrl` is unset, uploads fail with a `403 CorsPreflightFailure`. Outside Development only `Blob__CorsAllowedOrigins` is used, and it should stay empty for a real account. A failure to set the rule is logged as a warning. To check it against a running Azurite: `TEST_AZURITE_CONNECTION="UseDevelopmentStorage=true" dotnet test --filter BlobCorsConfiguratorTests`.
+
+For a real storage account, configure the rule yourself:
+
 | Setting | Value |
 | --- | --- |
 | Allowed origins | The web app origin, for example `https://app.example.com` (not `*` in production) |
