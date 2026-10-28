@@ -85,6 +85,26 @@ describe('PortalPage', () => {
     expect(calls[1].init!.headers).toMatchObject({ Authorization: 'Bearer session-1' });
   });
 
+  it('shows the message thread with the lender below the checklist', async () => {
+    mockApi({
+      'POST /api/portal/session': session,
+      'GET /api/portal/invite': () => jsonResponse(200, invite()),
+      'GET /api/portal/messages?page=1&pageSize=10': () =>
+        jsonResponse(200, {
+          items: [{ id: 'm1', authorType: 'Team', body: 'Please resend page 2', createdAt: '2027-01-05T10:00:00Z' }],
+          total: 1,
+          page: 1,
+          pageSize: 10,
+        }),
+    });
+
+    renderPortal();
+
+    const thread = await screen.findByRole('region', { name: 'Messages' });
+    expect(await within(thread).findByText('Please resend page 2')).toBeInTheDocument();
+    expect(within(thread).getByLabelText('Message your lender')).toBeInTheDocument();
+  });
+
   it('asks the party to accept the privacy notice before anything can be added', async () => {
     let accepted = false;
     const { calls } = mockApi({

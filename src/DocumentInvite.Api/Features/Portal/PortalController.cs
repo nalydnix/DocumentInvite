@@ -3,7 +3,9 @@ using System.Threading.RateLimiting;
 using DocumentInvite.Api.Common;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Files;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Invites;
+using DocumentInvite.Api.Features.Messaging;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -21,7 +23,7 @@ namespace DocumentInvite.Api.Features.Portal;
 [ApiController]
 [Route("api/portal")]
 [Authorize(AuthenticationSchemes = PortalAuth.Scheme, Policy = PortalAuth.Policy)]
-public class PortalController(PortalService service) : ControllerBase
+public class PortalController(PortalService service, MessagingService messaging) : ControllerBase
 {
     private Guid InviteId => Guid.Parse(User.FindFirstValue(PortalAuth.InviteClaim)!);
 
@@ -58,6 +60,18 @@ public class PortalController(PortalService service) : ControllerBase
     [HttpPut("items/{itemId:guid}/note")]
     public async Task<IActionResult> SaveNote(Guid itemId, SaveNoteRequest request, CancellationToken ct) =>
         ToActionResult(await service.SaveNoteAsync(InviteId, itemId, request.Note, ct));
+
+    /// <summary>The thread, newest first. Internal notes are never returned here.</summary>
+    [HttpGet("messages")]
+    public async Task<IActionResult> ListMessages([FromQuery] PageQuery query, CancellationToken ct) =>
+        ToActionResult(await messaging.ListForPartyAsync(InviteId, query, ct));
+
+    [HttpPost("messages")]
+    public async Task<IActionResult> PostMessage(PostMessageRequest request, CancellationToken ct)
+    {
+        var result = await messaging.PostPartyMessageAsync(InviteId, request.Body!, ct);
+        return result.Succeeded ? StatusCode(StatusCodes.Status201Created, result.Value) : ToActionResult(result);
+    }
 
     private IActionResult ToActionResult<T>(PortalResult<T> result)
     {
