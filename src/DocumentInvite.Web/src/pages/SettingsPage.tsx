@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { ErrorList, Field, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
+import { useDemoConfig } from './demo';
 
 interface Settings {
   defaultReminderIntervalDays: number;
@@ -113,8 +114,61 @@ function RunRemindersPanel() {
   );
 }
 
+interface DemoReset {
+  loans: number;
+  contacts: number;
+}
+
+function ResetDemoPanel() {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const reset = useMutation({
+    mutationFn: () => apiFetch<DemoReset>('/api/demo/reset', { method: 'POST' }),
+    onSuccess: () => {
+      setConfirming(false);
+      void queryClient.invalidateQueries();
+    },
+  });
+
+  return (
+    <div className="space-y-3">
+      <p>
+        Deletes all loans, contacts, uploaded files and stored emails, then creates the sample data again. The audit log
+        is kept and the reset is recorded in it.
+      </p>
+      <ErrorList messages={messagesOf(reset.error)} />
+      {reset.isSuccess && (
+        <p role="status" className="text-sm text-green-700">
+          Demo data reset. {plural(reset.data.loans, 'sample loan')} created.
+        </p>
+      )}
+      {confirming ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-ink">Delete all current loan data and start again?</span>
+          <button type="button" disabled={reset.isPending} onClick={() => reset.mutate()} className={primaryButtonClass}>
+            {reset.isPending ? 'Resetting...' : 'Yes, reset'}
+          </button>
+          <button
+            type="button"
+            disabled={reset.isPending}
+            onClick={() => setConfirming(false)}
+            className={secondaryButtonClass}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setConfirming(true)} className={secondaryButtonClass}>
+          Reset demo data
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => apiFetch<Settings>('/api/settings') });
+  const demo = useDemoConfig();
 
   return (
     <div className="space-y-6">
@@ -129,6 +183,11 @@ export function SettingsPage() {
       <Card title="Reminder job">
         <RunRemindersPanel />
       </Card>
+      {demo.enabled && (
+        <Card title="Demo data">
+          <ResetDemoPanel />
+        </Card>
+      )}
     </div>
   );
 }
