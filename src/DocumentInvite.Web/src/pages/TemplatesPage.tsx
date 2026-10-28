@@ -1,8 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { hasAnyRole, useAuth } from '../auth/AuthContext';
+import { Pagination } from '../components/Pagination';
 import { ErrorList, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
+import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 
 export interface TemplateSummary {
   id: string;
@@ -69,10 +71,13 @@ function TemplateRow({ template, canEdit }: { template: TemplateSummary; canEdit
 export function TemplatesPage() {
   const { state } = useAuth();
   const canEdit = state.status === 'authenticated' && hasAnyRole(state.user, ['Admin', 'LoanOfficer']);
+  const paging = usePaging();
   const templates = useQuery({
-    queryKey: ['templates'],
-    queryFn: () => apiFetch<TemplateSummary[]>('/api/templates?includeArchived=true'),
+    queryKey: ['templates', 'list', paging.page, paging.pageSize],
+    queryFn: () => apiFetch<PagedResponse<TemplateSummary>>(`/api/templates?${paging.params()}&includeArchived=true`),
+    placeholderData: keepPreviousData,
   });
+  useClampPage(paging, templates.data?.total);
 
   return (
     <div className="space-y-6">
@@ -86,12 +91,24 @@ export function TemplatesPage() {
       </div>
       {templates.isPending && <p className="text-sm text-ink-muted">Loading templates...</p>}
       {templates.isError && <ErrorList messages={messagesOf(templates.error)} />}
-      {templates.data && (
+      {templates.data && templates.data.total === 0 && (
+        <p className="text-sm text-ink-muted">No templates yet.</p>
+      )}
+      {templates.data && templates.data.items.length > 0 && (
         <ul className="space-y-3" aria-label="Templates">
-          {templates.data.map((template) => (
+          {templates.data.items.map((template) => (
             <TemplateRow key={`${template.id}:${template.isArchived}`} template={template} canEdit={canEdit} />
           ))}
         </ul>
+      )}
+      {templates.data && (
+        <Pagination
+          page={paging.page}
+          pageSize={paging.pageSize}
+          total={templates.data.total}
+          onPageChange={paging.setPage}
+          onPageSizeChange={paging.setPageSize}
+        />
       )}
     </div>
   );

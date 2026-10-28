@@ -119,7 +119,7 @@ describe('TemplatesPage', () => {
   it('lists templates and archives one', async () => {
     const { calls } = mockApi({
       ...signedIn(),
-      'GET /api/templates?includeArchived=true': () => jsonResponse(200, summaries),
+      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () => jsonResponse(200, { items: summaries, total: 2, page: 1, pageSize: 25 }),
       'POST /api/templates/t1/archive': () => jsonResponse(200, { ...summaries[0], isArchived: true }),
     });
     renderApp(<TemplatesPage />);
@@ -136,12 +136,75 @@ describe('TemplatesPage', () => {
   it('hides editing actions from viewers', async () => {
     mockApi({
       ...signedIn('Viewer'),
-      'GET /api/templates?includeArchived=true': () => jsonResponse(200, summaries),
+      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () => jsonResponse(200, { items: summaries, total: 2, page: 1, pageSize: 25 }),
     });
     renderApp(<TemplatesPage />);
 
     expect(await screen.findByText('SBA checklist')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'New template' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Archive/ })).not.toBeInTheDocument();
+  });
+
+  it('pages through the templates and keeps the page in the URL', async () => {
+    mockApi({
+      ...signedIn(),
+      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () =>
+        jsonResponse(200, { items: [summaries[0]], total: 26, page: 1, pageSize: 25 }),
+      'GET /api/templates?page=2&pageSize=25&includeArchived=true': () =>
+        jsonResponse(200, { items: [summaries[1]], total: 26, page: 2, pageSize: 25 }),
+    });
+    renderApp(<TemplatesPage />);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
+    expect(await screen.findByText('Old checklist')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
+  it('opens on the page named in the URL', async () => {
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/templates?page=2&pageSize=10&includeArchived=true': () =>
+        jsonResponse(200, { items: [summaries[1]], total: 11, page: 2, pageSize: 10 }),
+    });
+    renderApp(<TemplatesPage />, '/templates?page=2&pageSize=10');
+
+    expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
+    expect(calls.some((c) => c.key === 'GET /api/templates?page=2&pageSize=10&includeArchived=true')).toBe(true);
+  });
+
+  it('shows an empty state', async () => {
+    mockApi({
+      ...signedIn(),
+      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () =>
+        jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 25 }),
+    });
+    renderApp(<TemplatesPage />);
+
+    expect(await screen.findByText('No templates yet.')).toBeInTheDocument();
+  });
+
+  it('shows an error when the list cannot be loaded', async () => {
+    mockApi({
+      ...signedIn(),
+      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () => jsonResponse(500, { title: 'Boom' }),
+    });
+    renderApp(<TemplatesPage />);
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows a loading state while the list loads', async () => {
+    mockApi({
+      ...signedIn(),
+      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () => new Promise<Response>(() => {}),
+    });
+    renderApp(<TemplatesPage />);
+
+    expect(await screen.findByText('Loading templates...')).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Templates;
@@ -27,14 +28,111 @@ public class TemplateTests : StaffTestBase
     private static async Task<TemplateResponse> ReadAsync(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<TemplateResponse>())!;
 
+    private static Task<PagedResponse<TemplateSummaryResponse>?> ListAsync(HttpClient client, string query) =>
+        client.GetFromJsonAsync<PagedResponse<TemplateSummaryResponse>>($"/api/templates?{query}");
+
+    private async Task SeedAsync(int count, string prefix = "Seed", bool archived = false)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        for (var i = 0; i < count; i++)
+        {
+            db.Templates.Add(new Template
+            {
+                Id = Guid.NewGuid(),
+                Name = $"{prefix} {i:00}",
+                Description = "",
+                ArchivedAt = archived ? DateTimeOffset.UtcNow : null,
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task The_template_list_pages_by_name_with_a_partial_last_page()
+    {
+        var client = await OfficerAsync();
+        await SeedAsync(5);
+
+        var first = (await ListAsync(client, "page=1&pageSize=3"))!;
+        var last = (await ListAsync(client, "page=3&pageSize=3"))!;
+
+        first.Total.Should().Be(7);
+        first.PageSize.Should().Be(3);
+        first.Items.Select(t => t.Name).Should().Equal("Commercial real estate purchase", "SBA 7(a) business acquisition", "Seed 00");
+        last.Page.Should().Be(3);
+        last.Items.Should().ContainSingle().Which.Name.Should().Be("Seed 04");
+    }
+
+    [Fact]
+    public async Task A_template_page_past_the_end_is_empty_with_the_real_total()
+    {
+        var client = await OfficerAsync();
+
+        var page = (await ListAsync(client, "page=9&pageSize=2"))!;
+
+        page.Items.Should().BeEmpty();
+        page.Total.Should().Be(2);
+        page.Page.Should().Be(9);
+    }
+
+    [Fact]
+    public async Task Templates_with_the_same_name_still_page_without_overlap()
+    {
+        var client = await OfficerAsync();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (var i = 0; i < 4; i++)
+            {
+                db.Templates.Add(new Template { Id = Guid.NewGuid(), Name = "Same", Description = "" });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var one = (await ListAsync(client, "page=1&pageSize=3"))!;
+        var two = (await ListAsync(client, "page=2&pageSize=3"))!;
+
+        one.Items.Concat(two.Items).Select(t => t.Id).Distinct().Should().HaveCount(6);
+    }
+
+    [Fact]
+    public async Task The_archived_filter_applies_across_pages()
+    {
+        var client = await OfficerAsync();
+        await SeedAsync(3, archived: true);
+
+        (await ListAsync(client, "pageSize=2"))!.Total.Should().Be(2);
+        var all = (await ListAsync(client, "includeArchived=true&page=2&pageSize=2"))!;
+        all.Total.Should().Be(5);
+        all.Items.Should().HaveCount(2);
+    }
+
+    [Theory]
+    [InlineData("page=0")]
+    [InlineData("page=-1")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=101")]
+    [InlineData("page=abc")]
+    public async Task The_template_list_rejects_bad_paging(string query)
+    {
+        var client = await OfficerAsync();
+
+        (await client.GetAsync($"/api/templates?{query}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task The_two_lending_templates_are_seeded_with_items_and_form_fields()
     {
         var viewer = await ClientForAsync("viewer@example.com", [StaffRoles.Viewer]);
 
-        var list = await viewer.GetFromJsonAsync<List<TemplateSummaryResponse>>("/api/templates");
+        var page = await viewer.GetFromJsonAsync<PagedResponse<TemplateSummaryResponse>>("/api/templates");
+        var list = page!.Items;
 
-        list!.Select(t => t.Name).Should().BeEquivalentTo(
+        page.Total.Should().Be(2);
+        page.Page.Should().Be(1);
+        page.PageSize.Should().Be(25);
+        list.Select(t => t.Name).Should().BeEquivalentTo(
             "SBA 7(a) business acquisition", "Commercial real estate purchase");
         list.Should().OnlyContain(t => t.IsSeeded && !t.IsArchived && t.ItemCount >= 10);
 
@@ -150,9 +248,9 @@ public class TemplateTests : StaffTestBase
 
         archived.IsArchived.Should().BeTrue();
         archived.ArchivedAt.Should().NotBeNull();
-        (await client.GetFromJsonAsync<List<TemplateSummaryResponse>>("/api/templates"))!
+        (await ListAsync(client, ""))!.Items
             .Should().NotContain(t => t.Id == created.Id);
-        (await client.GetFromJsonAsync<List<TemplateSummaryResponse>>("/api/templates?includeArchived=true"))!
+        (await ListAsync(client, "includeArchived=true"))!.Items
             .Should().Contain(t => t.Id == created.Id && t.IsArchived);
         (await client.PutAsJsonAsync($"/api/templates/{created.Id}", Request("Old", Upload("A", id: created.Items[0].Id))))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);

@@ -1,0 +1,38 @@
+name: Reminders cron
+
+# Calls the API once an hour so parties are reminded about outstanding items and told when they
+# are overdue. The job is idempotent, so a repeated or manual run never sends anything twice.
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: reminders-cron
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Repository secrets: REMINDERS_API_URL is the API base URL (for example https://app.example.com)
+      # and REMINDERS_API_KEY must equal the API's Jobs__ApiKey setting.
+      API_URL: ${{ secrets.REMINDERS_API_URL }}
+      API_KEY: ${{ secrets.REMINDERS_API_KEY }}
+    steps:
+      - name: Call the reminders endpoint
+        run: |
+          set -euo pipefail
+          if [ -z "${API_URL}" ] || [ -z "${API_KEY}" ]; then
+            echo "::error::Set the REMINDERS_API_URL and REMINDERS_API_KEY repository secrets."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            --retry 2 --retry-delay 10 \
+            --request POST \
+            --header "X-Api-Key: ${API_KEY}" \
+            "${API_URL%/}/internal/jobs/reminders"
+          echo

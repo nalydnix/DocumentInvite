@@ -50,4 +50,42 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Too small.');
   });
+
+  it('runs the reminder job on request and shows the counts', async () => {
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/settings': () => jsonResponse(200, { defaultReminderIntervalDays: 7, retentionDaysAfterCompletion: 365 }),
+      'POST /api/jobs/reminders/run': () =>
+        jsonResponse(200, {
+          windowKey: 'manual-1',
+          alreadyRan: false,
+          invitesDue: 3,
+          remindersSent: 2,
+          overdueNoticesSent: 1,
+          failed: 0,
+        }),
+    });
+    renderApp(<SettingsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Run reminders now' }));
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('2 reminders sent');
+    expect(status).toHaveTextContent('1 overdue notice sent');
+    expect(status).toHaveTextContent('0 failed');
+    expect(calls.filter((c) => c.key === 'POST /api/jobs/reminders/run')).toHaveLength(1);
+  });
+
+  it('shows an error when the reminder job fails', async () => {
+    mockApi({
+      ...signedIn(),
+      'GET /api/settings': () => jsonResponse(200, { defaultReminderIntervalDays: 7, retentionDaysAfterCompletion: 365 }),
+      'POST /api/jobs/reminders/run': () => jsonResponse(500, { title: 'Server error' }),
+    });
+    renderApp(<SettingsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Run reminders now' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
 });

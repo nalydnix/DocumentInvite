@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card } from '../components/Card';
+import { Pagination } from '../components/Pagination';
 import { ErrorList, secondaryButtonClass } from '../components/Field';
+import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 import { ApiError, apiFetch } from '../lib/api';
 
 export interface OutboxEmailSummary {
@@ -18,13 +20,6 @@ export interface OutboxEmailDetail extends OutboxEmailSummary {
   htmlBody: string;
   textBody: string;
 }
-
-interface OutboxPageResponse {
-  items: OutboxEmailSummary[];
-  total: number;
-}
-
-const PAGE_SIZE = 50;
 
 function messagesOf(error: unknown): string[] {
   return error instanceof ApiError ? error.messages : error ? ['Something went wrong. Please try again.'] : [];
@@ -80,13 +75,15 @@ function EmailViewer({ id, onBack }: { id: string; onBack: () => void }) {
 }
 
 export function OutboxPage() {
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const paging = usePaging();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ['outbox', 'list', limit],
-    queryFn: () => apiFetch<OutboxPageResponse>(`/api/outbox?skip=0&take=${limit}`),
+    queryKey: ['outbox', 'list', paging.page, paging.pageSize],
+    queryFn: () => apiFetch<PagedResponse<OutboxEmailSummary>>(`/api/outbox?${paging.params()}`),
+    placeholderData: keepPreviousData,
   });
   const items = query.data?.items ?? [];
+  useClampPage(paging, query.data?.total);
 
   return (
     <div className="space-y-4">
@@ -94,7 +91,7 @@ export function OutboxPage() {
       <p className="text-sm text-ink-muted">Every email the system sends is kept here, newest first.</p>
       <ErrorList messages={messagesOf(query.error)} />
       {query.isPending && <p className="text-sm text-ink-muted">Loading...</p>}
-      {query.data && items.length === 0 && <Card title="No emails yet">Emails appear here as soon as they are sent.</Card>}
+      {query.data && query.data.total === 0 && <Card title="No emails yet">Emails appear here as soon as they are sent.</Card>}
 
       {items.length > 0 && (
         <div className="grid gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
@@ -122,11 +119,6 @@ export function OutboxPage() {
                 </li>
               ))}
             </ul>
-            {query.data && query.data.total > items.length && (
-              <button type="button" className={`${secondaryButtonClass} mt-3 w-full`} onClick={() => setLimit(limit + PAGE_SIZE)}>
-                Show more
-              </button>
-            )}
           </div>
 
           <div className={selectedId ? '' : 'hidden md:block'}>
@@ -136,6 +128,18 @@ export function OutboxPage() {
               <p className="text-sm text-ink-muted">Select an email to read it.</p>
             )}
           </div>
+        </div>
+      )}
+
+      {query.data && (
+        <div className={selectedId ? 'hidden md:block' : ''}>
+          <Pagination
+            page={paging.page}
+            pageSize={paging.pageSize}
+            total={query.data.total}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
         </div>
       )}
     </div>

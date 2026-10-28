@@ -23,6 +23,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
     public DbSet<OutboxEmail> OutboxEmails => Set<OutboxEmail>();
     public DbSet<Contact> Contacts => Set<Contact>();
+    public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<Invite> Invites => Set<Invite>();
+    public DbSet<RequestItem> RequestItems => Set<RequestItem>();
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,6 +85,89 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasIndex(x => new { x.LastName, x.FirstName });
             e.HasIndex(x => x.Email);
+        });
+
+        modelBuilder.Entity<Loan>(e =>
+        {
+            e.ToTable("Loans");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Reference).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.LoanType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.Reference).IsUnique();
+            e.HasIndex(x => new { x.CreatedAt, x.Id });
+            e.HasMany(x => x.Invites).WithOne().HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Invite>(e =>
+        {
+            e.ToTable("Invites");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.TokenHash).HasColumnType("binary(32)");
+            e.Property(x => x.PasswordHash).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            // One invite per party per loan.
+            e.HasIndex(x => new { x.LoanId, x.ContactId }).IsUnique();
+            e.HasOne<Contact>().WithMany().HasForeignKey(x => x.ContactId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.InviteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RequestItem>(e =>
+        {
+            e.ToTable("RequestItems");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Instructions).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.FieldType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RejectionReason).HasMaxLength(2000);
+            e.Property(x => x.FieldValue).HasMaxLength(4000);
+            e.Property(x => x.PartyNote).HasMaxLength(2000);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => new { x.InviteId, x.SortOrder });
+        });
+
+        modelBuilder.Entity<JobRun>(e =>
+        {
+            e.ToTable("JobRuns");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.JobName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.WindowKey).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Result).HasMaxLength(2000).IsRequired();
+            // One run per job and window: a second call for the same window cannot start another.
+            e.HasIndex(x => new { x.JobName, x.WindowKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<StoredFile>(e =>
+        {
+            e.ToTable("StoredFiles");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.BlobName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.StoredFileName).HasMaxLength(255);
+            e.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+            e.Property(x => x.Sha256).HasColumnType("binary(32)");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.BlobName).IsUnique();
+            // Two files of one item can never share a sequence number, even under concurrent completion.
+            e.HasIndex(x => new { x.RequestItemId, x.Sequence }).IsUnique().HasFilter("[Sequence] IS NOT NULL");
+            e.HasOne<RequestItem>().WithMany().HasForeignKey(x => x.RequestItemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Message>(e =>
+        {
+            e.ToTable("Messages");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.AuthorType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            e.HasIndex(x => new { x.InviteId, x.CreatedAt });
+            e.HasOne<Invite>().WithMany().HasForeignKey(x => x.InviteId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditEvent>(e =>
