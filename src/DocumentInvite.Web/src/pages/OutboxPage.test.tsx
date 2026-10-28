@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { jsonResponse, mockApi, renderApp, resetSession, tokens, meBody } from '../test-utils';
 import { framedDocument, OutboxPage } from './OutboxPage';
@@ -12,6 +12,7 @@ const newer = {
   createdAt: '2027-03-02T10:00:00.000Z',
   provider: 'Resend',
   deliveryError: 'Resend rejected the email (HTTP 422).',
+  isRead: true,
 };
 const older = { ...newer, id: 'e1', subject: 'Documents requested for Loan 42', createdAt: '2027-03-01T10:00:00.000Z', provider: 'Demo', deliveryError: null };
 const detail = {
@@ -87,6 +88,74 @@ describe('OutboxPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Reminder/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Resend rejected the email (HTTP 422).');
+  });
+
+  it('shows unread emails distinctly and marks one read when it is opened', async () => {
+    const unread = { ...older, id: 'e3', subject: 'Brand new', isRead: false };
+    let read = false;
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [{ ...unread, isRead: read }, newer], total: 2, page: 1, pageSize: 25 }),
+      'GET /api/outbox/e3': () => jsonResponse(200, { ...detail, ...unread, isRead: read }),
+      'POST /api/outbox/e3/read': () => {
+        read = true;
+        return new Response(null, { status: 204 });
+      },
+    });
+    renderApp(<OutboxPage />);
+
+    const row = (await screen.findByRole('button', { name: /Brand new/ })).closest('li')!;
+    expect(row).toHaveTextContent('Unread:');
+    expect(within(screen.getByRole('button', { name: /Reminder/ })).queryByText('Unread:', { exact: false })).not.toBeInTheDocument();
+
+    await userEvent.click(within(row).getByRole('button'));
+
+    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/outbox/e3/read')).toBe(true));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Brand new/ })).not.toHaveTextContent('Unread:'));
+    expect(await screen.findByRole('button', { name: 'Mark as unread' })).toBeInTheDocument();
+  });
+
+  it('does not mark an already read email read again', async () => {
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [older], total: 1, page: 1, pageSize: 25 }),
+      'GET /api/outbox/e1': () => jsonResponse(200, detail),
+    });
+    renderApp(<OutboxPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Documents requested/ }));
+    await screen.findByTitle('Email preview');
+
+    expect(calls.some((c) => c.key.startsWith('POST /api/outbox'))).toBe(false);
+  });
+
+  it('marks an open email as unread and back to read', async () => {
+    let read = true;
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/outbox?page=1&pageSize=25': () => jsonResponse(200, { items: [{ ...older, isRead: read }], total: 1, page: 1, pageSize: 25 }),
+      'GET /api/outbox/e1': () => jsonResponse(200, { ...detail, isRead: read }),
+      'POST /api/outbox/e1/unread': () => {
+        read = false;
+        return new Response(null, { status: 204 });
+      },
+      'POST /api/outbox/e1/read': () => {
+        read = true;
+        return new Response(null, { status: 204 });
+      },
+    });
+    renderApp(<OutboxPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /Documents requested/ }));
+    await user.click(await screen.findByRole('button', { name: 'Mark as unread' }));
+    await user.click(await screen.findByRole('button', { name: 'Mark as read' }));
+
+    expect(await screen.findByRole('button', { name: 'Mark as unread' })).toBeInTheDocument();
+    expect(calls.filter((c) => c.key.startsWith('POST /api/outbox')).map((c) => c.key)).toEqual([
+      'POST /api/outbox/e1/unread',
+      'POST /api/outbox/e1/read',
+    ]);
   });
 
   it('shows an empty state', async () => {

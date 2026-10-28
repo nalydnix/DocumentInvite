@@ -283,4 +283,103 @@ public class OutboxIntegrationTests : StaffTestBase
     {
         (await NewClient().GetAsync("/api/outbox")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    private sealed record Unread(int Count);
+
+    private static Task<Unread?> UnreadAsync(HttpClient client) => client.GetFromJsonAsync<Unread>("/api/outbox/unread-count");
+
+    [Fact]
+    public async Task Emails_start_unread_and_are_counted()
+    {
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        await SendAsync(Factory, Sample);
+        await SendAsync(Factory, Sample);
+
+        (await UnreadAsync(client))!.Count.Should().Be(2);
+        var page = await client.GetFromJsonAsync<PagedResponse<OutboxEmailSummary>>("/api/outbox");
+        page!.Items.Should().OnlyContain(i => !i.IsRead);
+    }
+
+    [Fact]
+    public async Task Marking_read_and_unread_updates_the_list_detail_and_count()
+    {
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
+        await SendAsync(Factory, Sample);
+
+        (await client.PostAsync($"/api/outbox/{id}/read", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await UnreadAsync(client))!.Count.Should().Be(1);
+        (await client.GetFromJsonAsync<OutboxEmailDetail>($"/api/outbox/{id}"))!.IsRead.Should().BeTrue();
+        var page = await client.GetFromJsonAsync<PagedResponse<OutboxEmailSummary>>("/api/outbox");
+        page!.Items.Single(i => i.Id == id).IsRead.Should().BeTrue();
+
+        (await client.PostAsync($"/api/outbox/{id}/unread", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await UnreadAsync(client))!.Count.Should().Be(2);
+        (await client.GetFromJsonAsync<OutboxEmailDetail>($"/api/outbox/{id}"))!.IsRead.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Marking_read_or_unread_twice_is_harmless()
+    {
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
+
+        (await client.PostAsync($"/api/outbox/{id}/read", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await client.PostAsync($"/api/outbox/{id}/read", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await UnreadAsync(client))!.Count.Should().Be(0);
+
+        (await client.PostAsync($"/api/outbox/{id}/unread", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await client.PostAsync($"/api/outbox/{id}/unread", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await UnreadAsync(client))!.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Read_state_is_kept_per_user()
+    {
+        var first = await ClientForAsync("lo1@example.com", [StaffRoles.LoanOfficer]);
+        var second = await ClientForAsync("lo2@example.com", [StaffRoles.Admin]);
+        var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
+
+        await first.PostAsync($"/api/outbox/{id}/read", null);
+
+        (await UnreadAsync(first))!.Count.Should().Be(0);
+        (await UnreadAsync(second))!.Count.Should().Be(1);
+        (await second.GetFromJsonAsync<OutboxEmailDetail>($"/api/outbox/{id}"))!.IsRead.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Marking_an_unknown_email_returns_404()
+    {
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+
+        (await client.PostAsync($"/api/outbox/{Guid.NewGuid()}/read", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PostAsync($"/api/outbox/{Guid.NewGuid()}/unread", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Deleting_an_email_removes_its_read_rows()
+    {
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
+        await client.PostAsync($"/api/outbox/{id}/read", null);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.OutboxEmails.ExecuteDeleteAsync();
+
+        (await db.OutboxEmailReads.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task The_read_endpoints_are_staff_only()
+    {
+        var auditor = await ClientForAsync("aud@example.com", [StaffRoles.Auditor]);
+        var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
+
+        (await auditor.GetAsync("/api/outbox/unread-count")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await auditor.PostAsync($"/api/outbox/{id}/read", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await NewClient().GetAsync("/api/outbox/unread-count")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 }

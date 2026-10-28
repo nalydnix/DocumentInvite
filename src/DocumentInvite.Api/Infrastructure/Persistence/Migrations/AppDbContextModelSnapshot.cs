@@ -541,6 +541,24 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("OutboxEmails", (string)null);
                 });
 
+            modelBuilder.Entity("DocumentInvite.Api.Domain.OutboxEmailRead", b =>
+                {
+                    b.Property<Guid>("OutboxEmailId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ReadAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("OutboxEmailId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("OutboxEmailReads", (string)null);
+                });
+
             modelBuilder.Entity("DocumentInvite.Api.Domain.RequestItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -874,6 +892,21 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.HasOne("DocumentInvite.Api.Domain.Invite", null)
                         .WithMany()
                         .HasForeignKey("InviteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DocumentInvite.Api.Domain.OutboxEmailRead", b =>
+                {
+                    b.HasOne("DocumentInvite.Api.Domain.OutboxEmail", null)
+                        .WithMany()
+                        .HasForeignKey("OutboxEmailId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DocumentInvite.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
