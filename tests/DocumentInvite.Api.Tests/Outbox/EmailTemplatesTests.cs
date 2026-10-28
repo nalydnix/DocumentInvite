@@ -94,4 +94,17 @@ public class EmailTemplatesTests
         builder.For("a-b_c").Should().Be("https://app.example.com/p/a-b_c");
         builder.For("a/b").Should().Be("https://app.example.com/p/a%2Fb");
     }
+
+    [Fact]
+    public void A_party_message_email_for_staff_encodes_names_and_links_to_the_loan_without_the_message_text()
+    {
+        var loanId = Guid.NewGuid();
+        var builder = new PortalLinkBuilder(Options.Create(new PortalOptions { BaseUrl = "https://app.example.com/" }));
+        var content = EmailTemplates.NewPartyMessage(new(
+            "Sam", "Loan 42", "Pat <b>O'Neil</b>", builder.ForLoan(loanId)));
+
+        content.Html.Should().Contain($"href=\"https://app.example.com/loans/{loanId}\"").And.NotContain("<b>");
+        content.Text.Should().Contain($"https://app.example.com/loans/{loanId}").And.Contain("You are receiving this");
+        content.Subject.Should().Contain("Loan 42");
+    }
 }

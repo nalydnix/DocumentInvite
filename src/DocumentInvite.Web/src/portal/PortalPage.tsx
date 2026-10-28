@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { ErrorList, Field, primaryButtonClass } from '../components/Field';
 import { ItemCard } from './ItemCard';
+import { PortalThread } from './PortalThread';
 import {
   acceptPrivacy,
   clearPortalSession,
@@ -257,6 +258,8 @@ function Checklist({ onSessionEnded, upload }: { onSessionEnded: () => void; upl
           <ItemCard key={item.id} item={item} privacyAccepted={data.privacyAccepted} onChanged={refresh} upload={upload} />
         ))}
       </ul>
+
+      <PortalThread privacyAccepted={data.privacyAccepted} onSessionEnded={onSessionEnded} />
     </>
   );
 }
