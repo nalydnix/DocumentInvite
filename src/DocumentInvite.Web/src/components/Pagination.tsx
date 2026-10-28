@@ -37,7 +37,7 @@ export function Pagination({
         <label className="flex items-center gap-2 whitespace-nowrap text-sm text-ink-muted">
           Rows per page
           <select
-            className={`${inputClass} mt-0 w-auto shrink-0`}
+            className={`${inputClass.replace('w-full', 'w-20')} mt-0 shrink-0`}
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
           >

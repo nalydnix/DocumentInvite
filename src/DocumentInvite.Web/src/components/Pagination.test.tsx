@@ -79,7 +79,8 @@ describe('Pagination', () => {
 
     const select = screen.getByRole('combobox');
     expect(select.closest('label')).toHaveClass('whitespace-nowrap');
-    expect(select).toHaveClass('shrink-0');
+    expect(select).toHaveClass('shrink-0', 'w-20');
+    expect(select).not.toHaveClass('w-full');
   });
 
   it('renders nothing when there are no rows', () => {
