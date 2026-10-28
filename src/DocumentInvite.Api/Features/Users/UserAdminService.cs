@@ -177,7 +177,7 @@ public sealed class UserAdminService(
     private async Task<UserResponse> ToResponseAsync(AppUser user) =>
         ToResponse(user, HighestRole(await users.GetRolesAsync(user)));
 
-    /// <summary>The most privileged of the given roles (Admin, LoanOfficer, Viewer, Auditor), if any.</summary>
+    /// <summary>The most privileged of the given roles (Admin, LoanOfficer, Auditor), if any.</summary>
     private static string HighestRole(IEnumerable<string> roles) =>
         StaffRoles.All.FirstOrDefault(roles.Contains) ?? string.Empty;
 

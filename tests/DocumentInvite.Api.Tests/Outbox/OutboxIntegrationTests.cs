@@ -268,7 +268,6 @@ public class OutboxIntegrationTests : StaffTestBase
     }
 
     [Theory]
-    [InlineData(StaffRoles.Viewer)]
     [InlineData(StaffRoles.Auditor)]
     public async Task Only_admins_and_loan_officers_can_read_the_outbox(string role)
     {

@@ -82,7 +82,7 @@ Migrations create the `audit_writer` database role: `SELECT` and `INSERT` are gr
 ## Staff authentication
 
 - Sign-in and token refresh are served at `POST /api/auth/login` and `POST /api/auth/refresh` (ASP.NET Core Identity bearer tokens). Registration, password reset and e-mail confirmation are disabled; Admins create users under `/api/users`.
-- Apply the migrations (`dotnet ef database update --project src/DocumentInvite.Api`) to create the Identity tables and seed the roles Admin, LoanOfficer, Viewer and Auditor.
+- Apply the migrations (`dotnet ef database update --project src/DocumentInvite.Api`) to create the Identity tables and seed the roles Admin, LoanOfficer and Auditor.
 - The first Admin is created on startup when `Bootstrap:AdminEmail` and `Bootstrap:AdminPassword` are configured (`Bootstrap__AdminEmail` and `Bootstrap__AdminPassword` as environment variables) and no Admin exists yet. `appsettings.Development.json` sets `admin@documentinvite.local` for local use; production must supply its own values through secrets and remove them after the first start.
 
 ## Demo mode
@@ -93,8 +93,7 @@ Set `Demo:Enabled=true` to seed a demo on startup (idempotent). Credentials come
 Demo__Enabled=true
 Demo__Accounts__Admin__Email / Demo__Accounts__Admin__Password
 Demo__Accounts__LoanOfficer__Email / Demo__Accounts__LoanOfficer__Password
-Demo__Accounts__Viewer__Email / Demo__Accounts__Viewer__Password
 Demo__Accounts__Auditor__Email / Demo__Accounts__Auditor__Password
 ```
 
-Passwords must meet the 12-character policy. Development settings enable it with local-only accounts. The seeder creates the four accounts, three sample contacts and loans (DEMO-1001 just sent, DEMO-1002 partly uploaded with one rejected item, DEMO-1003 fully approved) with sample PDFs, the matching emails in the Outbox and audit events. The sign-in page shows the Admin and Auditor logins (from `GET /api/demo/config`) only while demo mode is on. Admins can use Settings, Demo data, "Reset demo data" (`POST /api/demo/reset`) to delete and re-seed loans, contacts, emails and blobs; the audit log is kept and the reset is audited.
+Passwords must meet the 12-character policy. Development settings enable it with local-only accounts. The seeder creates the three accounts, three sample contacts and loans (DEMO-1001 just sent, DEMO-1002 partly uploaded with one rejected item, DEMO-1003 fully approved) with sample PDFs, the matching emails in the Outbox and audit events. The sign-in page shows the Admin and Auditor logins (from `GET /api/demo/config`) only while demo mode is on. Admins can use Settings, Demo data, "Reset demo data" (`POST /api/demo/reset`) to delete and re-seed loans, contacts, emails and blobs; the audit log is kept and the reset is audited.

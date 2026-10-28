@@ -89,7 +89,7 @@ export interface Loan
   invites: Invite[];
 }
 
-/** Roles that may create loans and send, revoke and reissue invites (the viewer role is read-only). */
+/** Roles that may create loans and send, revoke and reissue invites. */
 export const LOAN_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;
 
 export function formatAmount(amount: number): string {

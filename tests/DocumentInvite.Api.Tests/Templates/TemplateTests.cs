@@ -124,9 +124,9 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task The_two_lending_templates_are_seeded_with_items_and_form_fields()
     {
-        var viewer = await ClientForAsync("viewer@example.com", [StaffRoles.Viewer]);
+        var officer = await ClientForAsync("officer@example.com", [StaffRoles.LoanOfficer]);
 
-        var page = await viewer.GetFromJsonAsync<PagedResponse<TemplateSummaryResponse>>("/api/templates");
+        var page = await officer.GetFromJsonAsync<PagedResponse<TemplateSummaryResponse>>("/api/templates");
         var list = page!.Items;
 
         page.Total.Should().Be(2);
@@ -138,7 +138,7 @@ public class TemplateTests : StaffTestBase
 
         foreach (var summary in list)
         {
-            var template = await viewer.GetFromJsonAsync<TemplateResponse>($"/api/templates/{summary.Id}");
+            var template = await officer.GetFromJsonAsync<TemplateResponse>($"/api/templates/{summary.Id}");
             template!.Items.Select(i => i.SortOrder).Should().BeInAscendingOrder();
             template.Items.Should().Contain(i => i.Kind == ItemKind.FileUpload && i.AllowMultiple);
             template.Items.Where(i => i.Kind == ItemKind.FormField).Should()
@@ -282,19 +282,6 @@ public class TemplateTests : StaffTestBase
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("items[0].fieldType").And.Contain("requires a field type");
-    }
-
-    [Fact]
-    public async Task Viewers_can_read_but_not_change_templates()
-    {
-        var viewer = await ClientForAsync("viewer@example.com", [StaffRoles.Viewer]);
-        var id = TemplateSeeder.SbaTemplateId;
-
-        (await viewer.GetAsync("/api/templates")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.GetAsync($"/api/templates/{id}")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.PostAsJsonAsync("/api/templates", Request("X"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PutAsJsonAsync($"/api/templates/{id}", Request("X"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PostAsync($"/api/templates/{id}/archive", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]

@@ -28,5 +28,5 @@ export interface Contact {
 
 export type ContactPage = PagedResponse<Contact>;
 
-/** Roles that may create and edit contacts (the viewer role is read-only). */
+/** Roles that may create and edit contacts. */
 export const CONTACT_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;

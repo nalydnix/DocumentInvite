@@ -16,7 +16,6 @@ public class AuthorizationTests : StaffTestBase
         {
             [StaffRoles.Admin] = ["admin", "staff", "read", "audit", "any"],
             [StaffRoles.LoanOfficer] = ["staff", "read", "any"],
-            [StaffRoles.Viewer] = ["read", "any"],
             [StaffRoles.Auditor] = ["audit", "any"],
         };
 
