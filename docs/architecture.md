@@ -67,6 +67,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 - **StoredFile**: `RequestItemId`, `BlobName` (an opaque GUID path), `OriginalFileName`, `StoredFileName` (the canonical name, see §8), `ContentType`, `SizeBytes`, `Sha256`, `Sequence` (n), `Status` (PendingUpload, Ready, Superseded), `UploadedAt`.
 - **Message**: `InviteId`, `AuthorType` (Team, Party or System; System messages are written by the application, for example when an item is rejected), `AuthorUserId?`, `Body`, `IsInternal` (internal notes are never returned to the portal), `CreatedAt`.
 - **OutboxEmail**: `To`, `Subject`, `HtmlBody`, `TextBody`, `CreatedAt`, `Provider`, `ProviderMessageId?`, `DeliveryError?`. Every email is stored here, so `/outbox` can render it.
+- **OutboxEmailRead**: `OutboxEmailId`, `UserId`, `ReadAt`; the composite key is `(OutboxEmailId, UserId)`. A row means that user has read the email; no row means unread for that user. Rows cascade with the email and the user.
 - **AuditEvent** (append-only): `Id` (a `bigint` identity, which gives the chain order), `OccurredAt`, `ActorType` (User, Party, System, Anonymous), `ActorId?`, `Action` (a dotted code such as `item.approved`), `TargetType`, `TargetId?`, `IpAddress?`, `UserAgent?`, `CorrelationId`, `DetailsJson` (ids and enum values only), `PrevHash`, `Hash`.
 - **AppSettings** (a single row): `RetentionDaysAfterCompletion`, `DefaultReminderIntervalDays`, and similar values.
 - **JobRun**: `JobName`, `WindowKey`, `StartedAt`, `FinishedAt?`, `Result`. This table makes jobs idempotent (see §6).
@@ -127,7 +128,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 
 - `IEmailSender.SendAsync(EmailMessage)`. Templates are simple Razor-free C# string builders or embedded HTML templates covering: invite, reminder, overdue notice, item rejected, and new message.
 - Every email is written to `OutboxEmail` first (in the caller's transaction when one is open). When `Email:Provider=Resend`, it is then sent through the Resend HTTP API (`Resend:ApiKey` and `Email:From` come from configuration). A Resend failure is logged without addresses, recorded in `DeliveryError`, and returned to the caller as `EmailSendResult(Delivered=false)`; it is not thrown and the stored copy is kept.
-- `GET /api/outbox` (paged, newest first) and `GET /api/outbox/{id}` need `RequireStaff`, because stored emails hold live portal links.
+- `GET /api/outbox` (paged, newest first) and `GET /api/outbox/{id}` need `RequireStaff`, because stored emails hold live portal links. Both include a per-user `isRead` flag. `GET /api/outbox/unread-count` returns `{ count }` for the signed-in user, and `POST /api/outbox/{id}/read` and `/unread` set the state (both idempotent, 204). The web app marks an email read when it is opened and shows the count as a badge next to Outbox in the side nav, hidden at zero.
 - `/outbox` (a staff route in the web app) lists the stored emails and renders the HTML in a sandboxed iframe, so portal links can be clicked. In demo mode this is how the demo is driven.
 
 ## 11. Demo mode

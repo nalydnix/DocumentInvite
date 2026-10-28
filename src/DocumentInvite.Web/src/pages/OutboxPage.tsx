@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { Pagination } from '../components/Pagination';
 import { ErrorList, secondaryButtonClass } from '../components/Field';
 import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 import { ApiError, apiFetch } from '../lib/api';
+import { useSetOutboxRead } from '../lib/outbox';
 
 export interface OutboxEmailSummary {
   id: string;
@@ -13,6 +14,7 @@ export interface OutboxEmailSummary {
   createdAt: string;
   provider: 'Demo' | 'Resend';
   deliveryError: string | null;
+  isRead: boolean;
 }
 
 export interface OutboxEmailDetail extends OutboxEmailSummary {
@@ -36,6 +38,15 @@ export function framedDocument(html: string): string {
 function EmailViewer({ id, onBack }: { id: string; onBack: () => void }) {
   const query = useQuery({ queryKey: ['outbox', id], queryFn: () => apiFetch<OutboxEmailDetail>(`/api/outbox/${id}`) });
   const email = query.data;
+  const setRead = useSetOutboxRead();
+  const autoMarked = useRef(false);
+
+  // Opening an email reads it. This runs once per opened email, so a later "Mark as unread" sticks.
+  useEffect(() => {
+    if (!email || autoMarked.current) return;
+    autoMarked.current = true;
+    if (!email.isRead) setRead.mutate({ id, read: true });
+  }, [email, id, setRead]);
 
   return (
     <section aria-label="Email" className="space-y-3">
@@ -56,6 +67,15 @@ function EmailViewer({ id, onBack }: { id: string; onBack: () => void }) {
               <dt>Provider</dt>
               <dd>{email.provider}</dd>
             </dl>
+            <button
+              type="button"
+              disabled={setRead.isPending}
+              onClick={() => setRead.mutate({ id, read: !email.isRead })}
+              className={`${secondaryButtonClass} mt-3`}
+            >
+              {email.isRead ? 'Mark as unread' : 'Mark as read'}
+            </button>
+            <ErrorList messages={messagesOf(setRead.error)} />
             {email.deliveryError && (
               <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-red-700">
                 Not delivered: {email.deliveryError}
@@ -107,7 +127,15 @@ export function OutboxPage() {
                       item.id === selectedId ? 'bg-brand-50' : ''
                     }`}
                   >
-                    <span className="block break-words font-medium text-ink">{item.subject}</span>
+                    <span className={`flex items-start gap-2 break-words text-ink ${item.isRead ? 'font-medium' : 'font-bold'}`}>
+                      {!item.isRead && (
+                        <>
+                          <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" />
+                          <span className="sr-only">Unread: </span>
+                        </>
+                      )}
+                      <span>{item.subject}</span>
+                    </span>
                     <span className="block break-all text-ink-muted">{item.to}</span>
                     <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
                       <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
@@ -123,7 +151,7 @@ export function OutboxPage() {
 
           <div className={selectedId ? '' : 'hidden md:block'}>
             {selectedId ? (
-              <EmailViewer id={selectedId} onBack={() => setSelectedId(null)} />
+              <EmailViewer key={selectedId} id={selectedId} onBack={() => setSelectedId(null)} />
             ) : (
               <p className="text-sm text-ink-muted">Select an email to read it.</p>
             )}

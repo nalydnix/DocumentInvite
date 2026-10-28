@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { hasAnyRole, useAuth, type CurrentUser, type Role } from '../auth/AuthContext';
+import { useUnreadOutboxCount } from '../lib/outbox';
 import { secondaryButtonClass } from './Field';
 
 interface NavItem {
@@ -20,7 +21,18 @@ export const navItems: NavItem[] = [
   { to: '/settings', label: 'Settings', roles: ['Admin'] },
 ];
 
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">
+      {count > 99 ? '99+' : count}
+      <span className="sr-only"> unread</span>
+    </span>
+  );
+}
+
 function NavLinks({ user, onNavigate }: { user: CurrentUser; onNavigate?: () => void }) {
+  const outboxUnread = useUnreadOutboxCount(hasAnyRole(user, ['Admin', 'LoanOfficer']));
   return (
     <nav aria-label="Main" className="flex flex-col gap-1">
       {navItems
@@ -37,6 +49,7 @@ function NavLinks({ user, onNavigate }: { user: CurrentUser; onNavigate?: () => 
             }
           >
             {item.label}
+            {item.to === '/outbox' && <UnreadBadge count={outboxUnread} />}
           </NavLink>
         ))}
     </nav>

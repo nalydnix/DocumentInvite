@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
     public DbSet<OutboxEmail> OutboxEmails => Set<OutboxEmail>();
+    public DbSet<OutboxEmailRead> OutboxEmailReads => Set<OutboxEmailRead>();
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<Loan> Loans => Set<Loan>();
     public DbSet<Invite> Invites => Set<Invite>();
@@ -199,6 +200,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.ProviderMessageId).HasMaxLength(200);
             e.Property(x => x.DeliveryError).HasMaxLength(500);
             e.HasIndex(x => new { x.CreatedAt, x.Id });
+        });
+
+        modelBuilder.Entity<OutboxEmailRead>(e =>
+        {
+            e.ToTable("OutboxEmailReads");
+            e.HasKey(x => new { x.OutboxEmailId, x.UserId });
+            e.HasIndex(x => x.UserId);
+            e.HasOne<OutboxEmail>().WithMany().HasForeignKey(x => x.OutboxEmailId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
