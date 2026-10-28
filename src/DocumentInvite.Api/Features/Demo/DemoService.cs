@@ -17,7 +17,7 @@ public sealed class DemoService(
         }
 
         var logins = new List<DemoLogin>();
-        foreach (var role in new[] { StaffRoles.Admin, StaffRoles.Auditor })
+        foreach (var role in new[] { StaffRoles.Admin, StaffRoles.LoanOfficer, StaffRoles.Auditor })
         {
             if (options.Value.Accounts.TryGetValue(role, out var account) && account.IsComplete)
             {
