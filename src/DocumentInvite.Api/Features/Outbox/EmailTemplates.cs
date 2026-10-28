@@ -16,8 +16,10 @@ public sealed record ItemRejectedEmailModel(string RecipientName, string LoanNam
 
 public sealed record NewMessageEmailModel(string RecipientName, string LoanName, string PortalLink);
 
+public sealed record NewPartyMessageEmailModel(string RecipientName, string LoanName, string PartyName, string LoanLink);
+
 /// <summary>
-/// Pure functions that build the five emails, each with an HTML and a text body that both carry
+/// Pure functions that build the six emails, each with an HTML and a text body that both carry
 /// the portal link. Every value is HTML-encoded in the HTML body, and line breaks are removed
 /// from subjects. Message text is never included: parties read it in the portal.
 /// </summary>
@@ -64,6 +66,16 @@ public static class EmailTemplates
             "For your security, messages are shown only in your secure portal.",
         ]);
 
+    /// <summary>Tells a staff member that a party replied. The link opens the loan page, which needs a sign-in.</summary>
+    public static EmailContent NewPartyMessage(NewPartyMessageEmailModel m) => Build(
+        $"New message from {m.PartyName} about {m.LoanName}",
+        m.RecipientName, m.LoanLink, "Open the loan",
+        [
+            $"{m.PartyName} sent you a message about {m.LoanName}.",
+            "Sign in and open the loan to read and reply.",
+        ],
+        footer: "You are receiving this because you created this loan.");
+
     private static string Items(int count, bool capitalise = false)
     {
         var text = count == 1 ? "1 item is" : $"{count.ToString(CultureInfo.InvariantCulture)} items are";
@@ -74,7 +86,8 @@ public static class EmailTemplates
     private static string Date(DateOnly date) => date.ToString("d MMMM yyyy", CultureInfo.InvariantCulture);
 
     private static EmailContent Build(
-        string subject, string recipientName, string portalLink, string buttonLabel, IReadOnlyList<string> paragraphs)
+        string subject, string recipientName, string portalLink, string buttonLabel, IReadOnlyList<string> paragraphs,
+        string footer = "This link is personal to you. Please do not forward this email.")
     {
         if (!Uri.TryCreate(portalLink, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
         {
@@ -100,7 +113,7 @@ public static class EmailTemplates
             .Append(Encode(buttonLabel)).Append("</a></p>")
             .Append("<p style=\"margin:0 0 12px;font-size:13px;color:#6b7280\">If the button does not work, copy this link into your browser:<br>")
             .Append($"<a href=\"{href}\" target=\"_blank\" rel=\"noopener noreferrer\">{href}</a></p>")
-            .Append("<p style=\"margin:0;font-size:12px;color:#6b7280\">This link is personal to you. Please do not forward this email.</p>")
+            .Append($"<p style=\"margin:0;font-size:12px;color:#6b7280\">{Encode(footer)}</p>")
             .Append("</td></tr></table></body></html>");
 
         var text = new StringBuilder().AppendLine(greeting).AppendLine();
@@ -110,7 +123,7 @@ public static class EmailTemplates
         }
 
         text.AppendLine($"{buttonLabel}: {uri.AbsoluteUri}").AppendLine()
-            .AppendLine("This link is personal to you. Please do not forward this email.");
+            .AppendLine(footer);
 
         return new EmailContent(safeSubject, html.ToString(), text.ToString());
     }

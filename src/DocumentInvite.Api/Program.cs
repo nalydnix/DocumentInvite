@@ -3,6 +3,7 @@ using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Files;
 using DocumentInvite.Api.Features.Invites;
 using DocumentInvite.Api.Features.Loans;
+using DocumentInvite.Api.Features.Messaging;
 using DocumentInvite.Api.Features.Portal;
 using DocumentInvite.Api.Features.Templates;
 using DocumentInvite.Api.Features.Outbox;
@@ -22,6 +23,7 @@ builder.Services.AddReminders();
 builder.Services.AddFiles();
 builder.Services.AddPortal();
 builder.Services.AddReview();
+builder.Services.AddMessaging();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
