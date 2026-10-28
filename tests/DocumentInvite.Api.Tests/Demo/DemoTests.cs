@@ -84,7 +84,7 @@ public class DemoSeedingTests : DemoTestBase
         loans.Should().Equal(
             (DemoSeeder.SentReference, CollectionStatus.Sent),
             (DemoSeeder.PartlyUploadedReference, CollectionStatus.InProgress),
-            (DemoSeeder.ApprovedReference, CollectionStatus.Completed));
+            (DemoSeeder.ApprovedReference, CollectionStatus.ReadyToComplete));
 
         await WithDbAsync(async db =>
         {

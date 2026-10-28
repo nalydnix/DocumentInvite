@@ -288,12 +288,7 @@ public sealed class DemoSeeder(
         loan.Invites.Add(invite);
         StatusRecalculator.Apply(loan);
 
-        if (loan.Status == CollectionStatus.ReadyToComplete)
-        {
-            // Completion is explicit, so the demo loan that is fully approved is completed here.
-            loan.CompletedAt = now;
-            StatusRecalculator.Apply(loan);
-        }
+        // The fully approved demo loan stays Ready to complete: completion is an explicit staff action.
 
         db.Contacts.Add(contact);
         db.Loans.Add(loan);
