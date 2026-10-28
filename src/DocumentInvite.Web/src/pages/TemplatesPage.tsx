@@ -41,9 +41,6 @@ function TemplateRow({ template, canEdit }: { template: TemplateSummary; canEdit
           </p>
         </div>
         <div className="flex gap-2">
-          {template.isSeeded && (
-            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">Standard</span>
-          )}
           {template.isArchived && (
             <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-muted">
               Archived
