@@ -13,6 +13,7 @@ const demoOn = {
   enabled: true,
   logins: [
     { role: 'Admin', email: 'admin@demo.test', password: 'Demo-Admin-Passw0rd!' },
+    { role: 'LoanOfficer', email: 'officer@demo.test', password: 'Demo-Officer-Passw0rd!' },
     { role: 'Auditor', email: 'auditor@demo.test', password: 'Demo-Auditor-Passw0rd!' },
   ],
 };
@@ -26,12 +27,13 @@ function signedIn() {
 }
 
 describe('demo logins on the sign-in page', () => {
-  it('shows the Admin and Auditor logins and fills the form from one', async () => {
+  it('shows every demo login and fills the form from one', async () => {
     mockApi({ 'GET /api/demo/config': () => jsonResponse(200, demoOn) });
     renderApp(<LoginPage />, '/login');
 
     const panel = await screen.findByRole('region', { name: 'Demo logins' });
     expect(panel).toHaveTextContent('admin@demo.test');
+    expect(panel).toHaveTextContent('officer@demo.test');
     expect(panel).toHaveTextContent('auditor@demo.test');
 
     await userEvent.click(screen.getByRole('button', { name: 'Use the Auditor login' }));
