@@ -34,6 +34,11 @@ public sealed class ReviewService(
             return ReviewResult.Missing();
         }
 
+        if (loan!.CompletedAt is not null)
+        {
+            return ReviewResult.Refused(LoanLock.Message);
+        }
+
         if (item.Status != RequestItemStatus.Submitted)
         {
             return ReviewResult.Refused("Only a submitted item can be approved.");
@@ -43,7 +48,7 @@ public sealed class ReviewService(
         item.Status = RequestItemStatus.Approved;
         item.RejectionReason = null;
         Stamp(item, now);
-        StatusRecalculator.Apply(loan!, now);
+        StatusRecalculator.Apply(loan!);
 
         try
         {
@@ -72,6 +77,11 @@ public sealed class ReviewService(
             return ReviewResult.Missing();
         }
 
+        if (loan!.CompletedAt is not null)
+        {
+            return ReviewResult.Refused(LoanLock.Message);
+        }
+
         if (item.Status is not (RequestItemStatus.Submitted or RequestItemStatus.Approved))
         {
             return ReviewResult.Refused("Only a submitted or approved item can be rejected.");
@@ -93,7 +103,7 @@ public sealed class ReviewService(
         item.Status = RequestItemStatus.Rejected;
         item.RejectionReason = reason;
         Stamp(item, now);
-        StatusRecalculator.Apply(loan!, now);
+        StatusRecalculator.Apply(loan!);
 
         var token = PortalTokens.Generate();
         invite.TokenHash = PortalTokens.Hash(token);

@@ -20,6 +20,7 @@ public enum PortalFailure
     NotFound,
     PrivacyRequired,
     ItemLocked,
+    LoanLocked,
     Invalid,
     File,
 }
@@ -102,7 +103,7 @@ public sealed class PortalService(
             if (current.PortalOpenedAt is null)
             {
                 current.PortalOpenedAt = now;
-                StatusRecalculator.Apply(loan, now);
+                StatusRecalculator.Apply(loan);
             }
 
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -231,7 +232,7 @@ public sealed class PortalService(
             }
 
             MarkSubmitted(item);
-            StatusRecalculator.Apply(loan, clock.GetUtcNow());
+            StatusRecalculator.Apply(loan);
             await db.SaveChangesAsync(ct);
             return PortalResult<PortalFileResponse>.Ok(
                 new PortalFileResponse(file.Id, file.OriginalFileName, file.SizeBytes, file.UploadedAt));
@@ -276,7 +277,7 @@ public sealed class PortalService(
                 item.Status = RequestItemStatus.Outstanding;
             }
 
-            StatusRecalculator.Apply(loan, clock.GetUtcNow());
+            StatusRecalculator.Apply(loan);
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await audit.RecordAsync(
                 "portal.field_saved", new AuditTarget("request_item", itemId),
@@ -326,6 +327,13 @@ public sealed class PortalService(
         if (item is null || (kind is not null && item.Kind != kind))
         {
             return PortalFailure.NotFound;
+        }
+
+        var loanCompleted = await db.Loans.AsNoTracking()
+            .AnyAsync(l => l.CompletedAt != null && l.Invites.Any(i => i.Id == inviteId), ct);
+        if (loanCompleted)
+        {
+            return PortalFailure.LoanLocked;
         }
 
         var privacyAccepted = await db.Invites.AsNoTracking()

@@ -111,6 +111,8 @@ public class PortalController(PortalService service, MessagingService messaging)
                 "Accept the privacy notice before you add anything."),
             PortalFailure.ItemLocked => (409, "item_locked", "This item is approved",
                 "This item has already been approved and can no longer be changed."),
+            PortalFailure.LoanLocked => (409, "loan_completed", "This request is completed",
+                "This loan is completed and locked. Ask your lender to reopen the loan before making changes."),
             PortalFailure.File => DescribeFile(result.FileError!.Value),
             _ => (400, "invalid", "The request is not valid", "The request is not valid."),
         };

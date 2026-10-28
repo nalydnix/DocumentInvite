@@ -40,6 +40,8 @@ public sealed record LoanListQuery(
     int Page = PagingDefaults.DefaultPage,
     int PageSize = PagingDefaults.DefaultPageSize) : IPagedQuery;
 
+public sealed record ReopenLoanRequest(string? Reason);
+
 public sealed record LoanRequest(string? Reference, string? Name, decimal? Amount, string? LoanType);
 
 public sealed class LoanListQueryValidator : AbstractValidator<LoanListQuery>
@@ -49,6 +51,17 @@ public sealed class LoanListQueryValidator : AbstractValidator<LoanListQuery>
         Include(new PagedQueryValidator<LoanListQuery>());
         RuleFor(x => x.Search).MaximumLength(200);
         RuleFor(x => x.Status).IsInEnum().When(x => x.Status is not null);
+    }
+}
+
+public sealed class ReopenLoanRequestValidator : AbstractValidator<ReopenLoanRequest>
+{
+    public const int MaxReasonLength = 1000;
+
+    public ReopenLoanRequestValidator()
+    {
+        RuleFor(x => x.Reason).NotEmpty().WithMessage("A reason is required to reopen a loan.")
+            .MaximumLength(MaxReasonLength);
     }
 }
 
