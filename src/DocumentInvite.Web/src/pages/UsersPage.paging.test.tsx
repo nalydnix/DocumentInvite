@@ -10,11 +10,11 @@ const ann = {
   id: 'u1',
   email: 'ann@example.com',
   displayName: 'Ann Admin',
-  roles: ['Admin'],
+  role: 'Admin',
   accessExpiresAt: null,
   isLockedOut: false,
 };
-const bob = { ...ann, id: 'u2', email: 'bob@example.com', displayName: 'Bob Viewer', roles: ['Viewer'] };
+const bob = { ...ann, id: 'u2', email: 'bob@example.com', displayName: 'Bob Viewer', role: 'Viewer' };
 
 const page = (items: unknown[], total = items.length, pageNo = 1, pageSize = 25) => ({
   items,
