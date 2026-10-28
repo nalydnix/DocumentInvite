@@ -1,7 +1,8 @@
+import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { hasAnyRole, useAuth } from '../auth/AuthContext';
-import { ErrorList, primaryButtonClass, secondaryButtonClass } from '../components/Field';
+import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { StatusBadge } from '../components/StatusBadge';
 import { ApiError, apiDownload, apiFetch } from '../lib/api';
 import { partyLabel } from './contacts';
@@ -14,7 +15,7 @@ function messagesOf(error: unknown): string[] {
   return error instanceof ApiError ? error.messages : error ? ['Something went wrong. Please try again.'] : [];
 }
 
-function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) {
+function InviteRow({ invite, canWrite, locked }: { invite: Invite; canWrite: boolean; locked: boolean }) {
   const queryClient = useQueryClient();
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['loan', invite.loanId] });
@@ -65,7 +66,7 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
             <button
               type="button"
               className={secondaryButtonClass}
-              disabled={revoke.isPending}
+              disabled={revoke.isPending || locked}
               aria-label={`Revoke link for ${invite.partyName}`}
               onClick={() => revoke.mutate()}
             >
@@ -76,7 +77,7 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
             <button
               type="button"
               className={secondaryButtonClass}
-              disabled={reissue.isPending}
+              disabled={reissue.isPending || locked}
               aria-label={`Reissue link for ${invite.partyName}`}
               onClick={() => reissue.mutate()}
             >
@@ -87,13 +88,106 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
       )}
       <ul className="space-y-3 rounded-lg bg-surface-muted p-3" aria-label={`Items for ${invite.partyName}`}>
         {invite.items.map((item) => (
-          <ItemReview key={item.id} item={item} loanId={invite.loanId} canWrite={canWrite} />
+          <ItemReview key={item.id} item={item} loanId={invite.loanId} canWrite={canWrite} locked={locked} />
         ))}
       </ul>
       <InviteThread inviteId={invite.id} partyName={invite.partyName} canWrite={canWrite} />
       <ErrorList messages={[...messagesOf(revoke.error), ...messagesOf(reissue.error)]} />
       {reissue.isSuccess && <p role="status" className="text-sm text-ink-muted">A new link was emailed. The old link no longer works.</p>}
     </li>
+  );
+}
+
+/** Complete and reopen actions for the loan, with the API's refusals shown to the user. */
+function CompletionPanel({ loan }: { loan: Loan }) {
+  const queryClient = useQueryClient();
+  const [reopening, setReopening] = useState(false);
+  const [reason, setReason] = useState('');
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['loan', loan.id] });
+    await queryClient.invalidateQueries({ queryKey: ['loans'] });
+  };
+  const complete = useMutation({
+    mutationFn: () => apiFetch(`/api/loans/${loan.id}/complete`, { method: 'POST' }),
+    onSuccess: refresh,
+  });
+  const reopen = useMutation({
+    mutationFn: (text: string) => apiFetch(`/api/loans/${loan.id}/reopen`, { method: 'POST', body: { reason: text } }),
+    onSuccess: async () => {
+      setReopening(false);
+      setReason('');
+      await refresh();
+    },
+  });
+  const isCompleted = loan.status === 'Completed';
+
+  const submitReopen = (event: FormEvent) => {
+    event.preventDefault();
+    reopen.mutate(reason.trim());
+  };
+
+  return (
+    <section className="space-y-3" aria-label="Loan completion">
+      {isCompleted ? (
+        <>
+          <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            This loan is completed and locked. Items cannot be approved or rejected and invites cannot be sent or
+            revoked until it is reopened.
+          </p>
+          {!reopening && (
+            <button type="button" className={secondaryButtonClass} onClick={() => setReopening(true)}>
+              Reopen loan
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="space-y-1">
+          <button
+            type="button"
+            className={primaryButtonClass}
+            disabled={loan.status !== 'ReadyToComplete' || complete.isPending}
+            onClick={() => complete.mutate()}
+          >
+            {complete.isPending ? 'Completing...' : 'Complete loan'}
+          </button>
+          {loan.status !== 'ReadyToComplete' && (
+            <p className="text-xs text-ink-muted">Available once every item is approved.</p>
+          )}
+        </div>
+      )}
+      {reopening && (
+        <form onSubmit={submitReopen} className="space-y-2">
+          <label className="block text-sm font-medium text-ink">
+            Reason for reopening this loan
+            <textarea
+              className={inputClass}
+              rows={3}
+              maxLength={1000}
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </label>
+          <p className="text-xs text-ink-muted">The reason is posted to every party's message thread.</p>
+          <div className="flex gap-2">
+            <button type="submit" className={primaryButtonClass} disabled={reopen.isPending || reason.trim() === ''}>
+              Reopen
+            </button>
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={() => {
+                setReopening(false);
+                reopen.reset();
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      <ErrorList messages={[...messagesOf(complete.error), ...messagesOf(reopen.error)]} />
+    </section>
   );
 }
 
@@ -130,6 +224,7 @@ export function LoanDetailPage() {
   }
 
   const data = loan.data;
+  const locked = data.status === 'Completed';
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -160,6 +255,8 @@ export function LoanDetailPage() {
         <ErrorList messages={messagesOf(exportApproved.error)} />
       </div>
 
+      {canWrite && <CompletionPanel loan={data} />}
+
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-ink">Parties</h2>
         {data.invites.length === 0 ? (
@@ -167,13 +264,13 @@ export function LoanDetailPage() {
         ) : (
           <ul className="space-y-3" aria-label="Parties">
             {data.invites.map((invite) => (
-              <InviteRow key={invite.id} invite={invite} canWrite={canWrite} />
+              <InviteRow key={invite.id} invite={invite} canWrite={canWrite} locked={locked} />
             ))}
           </ul>
         )}
       </section>
 
-      {canWrite && <SendInvitesPanel loanId={data.id} existingInvites={data.invites} />}
+      {canWrite && !locked && <SendInvitesPanel loanId={data.id} existingInvites={data.invites} />}
     </div>
   );
 }

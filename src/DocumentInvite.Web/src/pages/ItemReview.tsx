@@ -12,6 +12,8 @@ const ITEM_STATUS_STYLES: Record<RequestItemStatus, string> = {
   Rejected: 'bg-red-50 text-red-700',
 };
 
+const LOCKED_HINT = 'This loan is completed. Reopen it to review items.';
+
 function messagesOf(error: unknown): string[] {
   return error instanceof ApiError ? error.messages : error ? ['Something went wrong. Please try again.'] : [];
 }
@@ -60,7 +62,18 @@ function FileRow({ file, canWrite, label }: { file: ItemFile; canWrite: boolean;
 }
 
 /** One requested item: its status, answers and files, with approve and reject for those who may review. */
-export function ItemReview({ item, loanId, canWrite }: { item: InviteItem; loanId: string; canWrite: boolean }) {
+export function ItemReview({
+  item,
+  loanId,
+  canWrite,
+  locked = false,
+}: {
+  item: InviteItem;
+  loanId: string;
+  canWrite: boolean;
+  /** True on a Completed loan: review controls stay visible but disabled. */
+  locked?: boolean;
+}) {
   const queryClient = useQueryClient();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -131,7 +144,8 @@ export function ItemReview({ item, loanId, canWrite }: { item: InviteItem; loanI
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={approve.isPending}
+              disabled={approve.isPending || locked}
+              title={locked ? LOCKED_HINT : undefined}
               aria-label={`Approve ${item.name}`}
               onClick={() => approve.mutate()}
             >
@@ -142,6 +156,8 @@ export function ItemReview({ item, loanId, canWrite }: { item: InviteItem; loanI
             <button
               type="button"
               className={secondaryButtonClass}
+              disabled={locked}
+              title={locked ? LOCKED_HINT : undefined}
               aria-label={`Reject ${item.name}`}
               onClick={() => setRejecting(true)}
             >
