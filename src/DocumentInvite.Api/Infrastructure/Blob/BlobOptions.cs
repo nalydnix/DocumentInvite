@@ -13,7 +13,7 @@ public sealed class BlobOptions
     public bool CreateContainerIfMissing { get; set; } = true;
 
     /// <summary>
-    /// Web origins allowed to upload straight to storage. When set, the API applies the CORS rule at startup (for Azurite).
+    /// Web origins allowed to upload straight to storage. When set, the API applies the CORS rule at startup (for Azurite). In Development <c>Portal:BaseUrl</c> is added too.
     /// Leave empty when the storage account is provisioned separately.
     /// </summary>
     public string[] CorsAllowedOrigins { get; set; } = [];
