@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentInvite.Api.Features.Review;
 
-/// <summary>Approving and rejecting items is for staff only: a viewer can look but not decide.</summary>
+/// <summary>Approving and rejecting items is for staff only.</summary>
 [ApiController]
 [Authorize(Policy = AuthPolicies.RequireStaff)]
 public class ReviewController(ReviewService service) : ControllerBase

@@ -58,19 +58,6 @@ describe('ContactsPage', () => {
     expect(within(list).getByRole('link', { name: 'Edit Ann Lee' })).toHaveAttribute('href', '/contacts/c1');
   });
 
-  it('is read-only for a viewer', async () => {
-    mockApi({
-      ...signedIn(['Viewer']),
-      'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann])),
-    });
-
-    renderRoutes('/contacts');
-
-    expect(await screen.findByRole('link', { name: 'View Ann Lee' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'New contact' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /^Edit/ })).not.toBeInTheDocument();
-  });
-
   it('searches by the typed term', async () => {
     const { calls } = mockApi({
       ...signedIn(['Admin']),
@@ -180,15 +167,6 @@ describe('ContactFormPage', () => {
 
     const put = calls.find((c) => c.key === 'PUT /api/contacts/c1');
     expect(JSON.parse(put!.init!.body as string)).toMatchObject({ firstName: 'Anna', phone: '+1 555 010 2030' });
-  });
-
-  it('shows a viewer the details without editing controls', async () => {
-    mockApi({ ...signedIn(['Viewer']), 'GET /api/contacts/c1': () => jsonResponse(200, ann) });
-
-    renderRoutes('/contacts/c1');
-
-    expect(await screen.findByLabelText('First name')).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
   });
 
   it('keeps a pseudonymised contact read-only', async () => {

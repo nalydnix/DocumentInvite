@@ -8,13 +8,13 @@ namespace DocumentInvite.Api.Features.Files;
 [ApiController]
 public class FilesController(FileReadService service) : ControllerBase
 {
-    /// <summary>A viewer may preview a file inline.</summary>
+    /// <summary>Staff may preview a file inline.</summary>
     [HttpGet("api/files/{id:guid}/preview-url")]
     [Authorize(Policy = AuthPolicies.CanRead)]
     public async Task<IActionResult> Preview(Guid id, CancellationToken ct) =>
         ToActionResult(await service.CreateReadUrlAsync(id, false, ct));
 
-    /// <summary>Downloading is for staff only: a viewer cannot download.</summary>
+    /// <summary>Downloading is for staff only.</summary>
     [HttpGet("api/files/{id:guid}/download-url")]
     [Authorize(Policy = AuthPolicies.RequireStaff)]
     public async Task<IActionResult> Download(Guid id, CancellationToken ct) =>

@@ -132,11 +132,11 @@ public class GdprTests : StaffTestBase
     }
 
     [Fact]
-    public async Task Export_is_refused_for_a_viewer_and_missing_contacts_are_404()
+    public async Task Export_is_refused_for_an_auditor_and_missing_contacts_are_404()
     {
         var seeded = await SeedAsync();
-        var viewer = await ClientForAsync("viewer@example.com", [StaffRoles.Viewer]);
-        (await viewer.GetAsync(Url(seeded.ContactId, "export"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var auditor = await ClientForAsync("auditor@example.com", [StaffRoles.Auditor]);
+        (await auditor.GetAsync(Url(seeded.ContactId, "export"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var officer = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
         (await officer.GetAsync(Url(Guid.NewGuid(), "export"))).StatusCode.Should().Be(HttpStatusCode.NotFound);

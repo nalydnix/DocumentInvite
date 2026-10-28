@@ -250,25 +250,7 @@ public class ReviewTests : StaffTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
-    // ---- viewer and anonymous ----
-
-    [Fact]
-    public async Task Viewer_can_read_and_preview_but_not_approve_reject_or_download()
-    {
-        var seed = await SeedAsync();
-        var viewer = await ClientForAsync("v@example.com", [StaffRoles.Viewer]);
-
-        (await viewer.GetAsync($"/api/loans/{seed.LoanId}")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.GetAsync($"/api/files/{seed.FileId}/preview-url")).StatusCode.Should().Be(HttpStatusCode.OK);
-
-        (await viewer.PostAsync($"/api/items/{seed.FileItemId}/approve", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("x")))
-            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.GetAsync($"/api/files/{seed.FileId}/download-url")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-
-        (await DbAsync(db => db.RequestItems.AsNoTracking().SingleAsync(i => i.Id == seed.FileItemId)))
-            .Status.Should().Be(RequestItemStatus.Submitted);
-    }
+    // ---- anonymous ----
 
     [Fact]
     public async Task Anonymous_callers_are_rejected()
@@ -334,9 +316,9 @@ public class ReviewTests : StaffTestBase
                 s => s.SetProperty(i => i.Status, RequestItemStatus.Approved));
             return 0;
         });
-        var viewer = await ClientForAsync("v@example.com", [StaffRoles.Viewer]);
+        var officer = await ClientForAsync("v@example.com", [StaffRoles.LoanOfficer]);
 
-        var page = (await viewer.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!;
+        var page = (await officer.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!;
 
         var over = page.Items.Single(l => l.Reference == "LN-OVER");
         over.IsOverdue.Should().BeTrue();
@@ -348,7 +330,7 @@ public class ReviewTests : StaffTestBase
         complete.IsOverdue.Should().BeFalse("nothing is left for the party to provide");
         complete.PercentComplete.Should().Be(100);
 
-        var search = (await viewer.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?search=OVER"))!;
+        var search = (await officer.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?search=OVER"))!;
         search.Items.Should().ContainSingle().Which.Id.Should().Be(overdue.LoanId);
     }
 

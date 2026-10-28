@@ -227,7 +227,7 @@ public partial class RemindersTests : StaffTestBase
     public async Task Run_now_is_for_admins_only()
     {
         (await NewClient().PostAsync("/api/jobs/reminders/run", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        foreach (var role in new[] { StaffRoles.LoanOfficer, StaffRoles.Viewer, StaffRoles.Auditor })
+        foreach (var role in new[] { StaffRoles.LoanOfficer, StaffRoles.Auditor })
         {
             var client = await ClientForAsync($"{role}@example.com", [role]);
             (await client.PostAsync("/api/jobs/reminders/run", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);

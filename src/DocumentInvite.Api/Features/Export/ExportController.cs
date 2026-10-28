@@ -6,7 +6,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace DocumentInvite.Api.Features.Export;
 
-/// <summary>Package export is for Admins and LoanOfficers only: a viewer cannot download.</summary>
+/// <summary>Package export is for Admins and LoanOfficers only.</summary>
 [ApiController]
 [Authorize(Policy = AuthPolicies.RequireStaff)]
 public class ExportController(ExportService service) : ControllerBase
