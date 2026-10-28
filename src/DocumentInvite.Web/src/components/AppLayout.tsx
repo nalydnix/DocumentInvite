@@ -12,10 +12,10 @@ interface NavItem {
 
 export const navItems: NavItem[] = [
   { to: '/', label: 'Home' },
-  { to: '/loans', label: 'Loans', roles: ['Admin', 'LoanOfficer', 'Viewer'] },
-  { to: '/templates', label: 'Templates', roles: ['Admin', 'LoanOfficer', 'Viewer'] },
+  { to: '/loans', label: 'Loans', roles: ['Admin', 'LoanOfficer'] },
+  { to: '/templates', label: 'Templates', roles: ['Admin', 'LoanOfficer'] },
   { to: '/outbox', label: 'Outbox', roles: ['Admin', 'LoanOfficer'] },
-  { to: '/contacts', label: 'Contacts', roles: ['Admin', 'LoanOfficer', 'Viewer'] },
+  { to: '/contacts', label: 'Contacts', roles: ['Admin', 'LoanOfficer'] },
   { to: '/users', label: 'Users', roles: ['Admin'] },
   { to: '/audit', label: 'Audit log', roles: ['Admin', 'Auditor'] },
   { to: '/settings', label: 'Settings', roles: ['Admin'] },

@@ -35,7 +35,7 @@ export default function App() {
                 <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer']} />}>
                   <Route path="outbox" element={<OutboxPage />} />
                 </Route>
-                <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer', 'Viewer']} />}>
+                <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer']} />}>
                   <Route path="templates" element={<TemplatesPage />} />
                   <Route path="templates/new" element={<TemplateEditorPage />} />
                   <Route path="templates/:id" element={<TemplateEditorPage />} />

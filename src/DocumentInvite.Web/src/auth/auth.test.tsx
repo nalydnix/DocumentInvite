@@ -25,7 +25,7 @@ function AppRoutes() {
   );
 }
 
-const loginRoutes = (roles: ('Admin' | 'LoanOfficer' | 'Viewer' | 'Auditor')[]) => ({
+const loginRoutes = (roles: ('Admin' | 'LoanOfficer' | 'Auditor')[]) => ({
   'POST /api/auth/login': () => jsonResponse(200, tokens),
   'GET /api/me': () => jsonResponse(200, meBody(roles, 'Dana Admin')),
 });
@@ -66,7 +66,7 @@ describe('sign-in and protected routes', () => {
   });
 
   it('blocks a signed-in user whose role does not allow the page', async () => {
-    mockApi(loginRoutes(['Viewer']));
+    mockApi(loginRoutes(['LoanOfficer']));
 
     renderApp(<AppRoutes />, '/users');
     await signInThroughForm();

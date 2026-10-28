@@ -5,7 +5,6 @@ public static class StaffRoles
 {
     public const string Admin = nameof(StaffRole.Admin);
     public const string LoanOfficer = nameof(StaffRole.LoanOfficer);
-    public const string Viewer = nameof(StaffRole.Viewer);
     public const string Auditor = nameof(StaffRole.Auditor);
 
     public static readonly IReadOnlyList<string> All = Enum.GetNames<StaffRole>();
@@ -16,7 +15,6 @@ public enum StaffRole
 {
     Admin,
     LoanOfficer,
-    Viewer,
     Auditor,
 }
 

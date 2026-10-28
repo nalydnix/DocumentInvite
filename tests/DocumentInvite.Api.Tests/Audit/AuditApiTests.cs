@@ -43,7 +43,6 @@ public class AuditApiTests : StaffTestBase
 
     [Theory]
     [InlineData(StaffRoles.LoanOfficer)]
-    [InlineData(StaffRoles.Viewer)]
     public async Task Other_roles_are_forbidden(string role)
     {
         var client = await ClientForAsync("o@example.com", [role]);
@@ -292,7 +291,7 @@ public class AuditApiTests : StaffTestBase
     {
         foreach (var (email, role) in new[]
                  {
-                     ("lo@example.com", StaffRoles.LoanOfficer), ("v@example.com", StaffRoles.Viewer),
+                     ("lo@example.com", StaffRoles.LoanOfficer),
                      ("aud@example.com", StaffRoles.Auditor),
                  })
         {

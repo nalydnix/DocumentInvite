@@ -126,18 +126,6 @@ describe('LoansPage', () => {
     expect(await screen.findByRole('link', { name: 'New loan' })).toBeInTheDocument();
   });
 
-  it('hides the create link from a viewer', async () => {
-    mockApi({
-      ...signedIn(['Viewer']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
-    });
-
-    renderRoutes('/loans');
-
-    await screen.findByRole('list', { name: 'Loans' });
-    expect(screen.queryByRole('link', { name: 'New loan' })).not.toBeInTheDocument();
-  });
-
   it('filters by status', async () => {
     const { calls } = mockApi({
       ...signedIn(['Admin']),
@@ -241,13 +229,6 @@ describe('LoanFormPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('already exists');
   });
 
-  it('does not let a viewer create loans', async () => {
-    mockApi(signedIn(['Viewer']));
-
-    renderRoutes('/loans/new');
-
-    expect(await screen.findByText('Your role cannot create loans.')).toBeInTheDocument();
-  });
 });
 
 describe('LoanDetailPage', () => {
@@ -319,23 +300,6 @@ describe('LoanDetailPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Download approved' }));
 
     expect(await screen.findByText(/no approved documents/)).toBeInTheDocument();
-  });
-
-  it('hides the export button from a viewer', async () => {
-    mockApi(routes(['Viewer']));
-    renderRoutes('/loans/l1');
-    await screen.findByText('Ann Lee');
-    expect(screen.queryByRole('button', { name: 'Download approved' })).not.toBeInTheDocument();
-  });
-
-  it('shows a viewer the parties without any actions', async () => {
-    mockApi(routes(['Viewer']));
-
-    renderRoutes('/loans/l1');
-
-    await screen.findByText('Ann Lee');
-    expect(screen.queryByRole('button', { name: /Revoke link/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add party' })).not.toBeInTheDocument();
   });
 
   it('revokes a link', async () => {
@@ -488,7 +452,7 @@ describe('LoanDetailPage', () => {
 describe('LoansPage dashboard', () => {
   it('shows progress, due date and an overdue flag on each loan', async () => {
     mockApi({
-      ...signedIn(['Viewer']),
+      ...signedIn(['LoanOfficer']),
       'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([{ ...summary, isOverdue: true }])),
     });
 
@@ -503,7 +467,7 @@ describe('LoansPage dashboard', () => {
 
   it('does not flag a loan that is not overdue', async () => {
     mockApi({
-      ...signedIn(['Viewer']),
+      ...signedIn(['LoanOfficer']),
       'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
     });
 

@@ -19,7 +19,7 @@ const template: TemplateDetail = {
   ],
 };
 
-function signedIn(role: 'Admin' | 'LoanOfficer' | 'Viewer' = 'LoanOfficer') {
+function signedIn(role: 'Admin' | 'LoanOfficer' = 'LoanOfficer') {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
   return {
     'POST /api/auth/refresh': () => jsonResponse(200, tokens),
@@ -100,14 +100,6 @@ describe('TemplateEditorPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('requires a field type');
   });
 
-  it('is read-only for viewers', async () => {
-    mockApi({ ...signedIn('Viewer'), 'GET /api/templates/t1': () => jsonResponse(200, template) });
-    renderEditor('/templates/t1');
-
-    expect(await screen.findByLabelText('Template name')).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Save template' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add file upload' })).not.toBeInTheDocument();
-  });
 });
 
 describe('TemplatesPage', () => {
@@ -131,18 +123,6 @@ describe('TemplatesPage', () => {
 
     expect(calls.some((c) => c.key === 'POST /api/templates/t1/archive')).toBe(true);
     expect(screen.getByRole('button', { name: 'Restore Old checklist' })).toBeInTheDocument();
-  });
-
-  it('hides editing actions from viewers', async () => {
-    mockApi({
-      ...signedIn('Viewer'),
-      'GET /api/templates?page=1&pageSize=25&includeArchived=true': () => jsonResponse(200, { items: summaries, total: 2, page: 1, pageSize: 25 }),
-    });
-    renderApp(<TemplatesPage />);
-
-    expect(await screen.findByText('SBA checklist')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'New template' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Archive/ })).not.toBeInTheDocument();
   });
 
   it('pages through the templates and keeps the page in the URL', async () => {

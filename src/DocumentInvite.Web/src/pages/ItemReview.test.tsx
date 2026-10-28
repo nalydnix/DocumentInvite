@@ -157,7 +157,7 @@ describe('item review', () => {
   });
 
   it('previews a PDF inline and an image as an image', async () => {
-    const { calls } = setup(['Viewer'], loanWith([pdfItem, imageItem]), {
+    const { calls } = setup(['LoanOfficer'], loanWith([pdfItem, imageItem]), {
       'GET /api/files/f1/preview-url': () =>
         jsonResponse(200, { url: 'https://blob/f1?sp=r', expiresAt: '2027-01-01T00:05:00Z', fileName: 'x', contentType: 'application/pdf' }),
       'GET /api/files/f2/preview-url': () =>
@@ -172,17 +172,6 @@ describe('item review', () => {
     await user.click(screen.getByRole('button', { name: 'Preview id.pdf for Photo ID' }));
     expect(await screen.findByAltText('Preview of id.pdf')).toHaveAttribute('src', 'https://blob/f2?sp=r');
     expect(calls.filter((c) => c.key.includes('preview-url'))).toHaveLength(2);
-  });
-
-  it('gives a viewer preview but no approve, reject or download', async () => {
-    setup(['Viewer'], loanWith([pdfItem]));
-
-    await screen.findByRole('list', { name: 'Items for Ann Lee' });
-
-    expect(screen.getByRole('button', { name: /^Preview/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Approve/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Reject/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Download/ })).not.toBeInTheDocument();
   });
 
   it('shows the rejection reason on a rejected item and offers no approve', async () => {

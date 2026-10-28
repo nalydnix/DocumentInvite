@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch, clearSession, hasStoredSession, onSessionEnded, refreshSession, signIn } from '../lib/api';
 
-export const ROLES = ['Admin', 'LoanOfficer', 'Viewer', 'Auditor'] as const;
+export const ROLES = ['Admin', 'LoanOfficer', 'Auditor'] as const;
 export type Role = (typeof ROLES)[number];
 
 export interface CurrentUser {

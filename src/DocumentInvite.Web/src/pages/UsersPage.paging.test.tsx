@@ -14,7 +14,7 @@ const ann = {
   accessExpiresAt: null,
   isLockedOut: false,
 };
-const bob = { ...ann, id: 'u2', email: 'bob@example.com', displayName: 'Bob Viewer', role: 'Viewer' };
+const bob = { ...ann, id: 'u2', email: 'bob@example.com', displayName: 'Bob Officer', role: 'LoanOfficer' };
 
 const page = (items: unknown[], total = items.length, pageNo = 1, pageSize = 25) => ({
   items,
@@ -49,7 +49,7 @@ describe('UsersPage pagination', () => {
 
     renderRoutes('/users?page=2&pageSize=50');
 
-    expect(await screen.findByText('Bob Viewer')).toBeInTheDocument();
+    expect(await screen.findByText('Bob Officer')).toBeInTheDocument();
     expect(screen.getByText(/Showing 51.60 of 60/)).toBeInTheDocument();
   });
 
@@ -63,7 +63,7 @@ describe('UsersPage pagination', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Next' }));
 
-    expect(await screen.findByText('Bob Viewer')).toBeInTheDocument();
+    expect(await screen.findByText('Bob Officer')).toBeInTheDocument();
     expect(calls.some((c) => c.key === 'GET /api/users?page=2&pageSize=25')).toBe(true);
   });
 
@@ -76,7 +76,7 @@ describe('UsersPage pagination', () => {
 
     renderRoutes('/users?page=9');
 
-    expect(await screen.findByText('Bob Viewer')).toBeInTheDocument();
+    expect(await screen.findByText('Bob Officer')).toBeInTheDocument();
     expect(calls.some((c) => c.key.includes('page=2'))).toBe(true);
   });
 
