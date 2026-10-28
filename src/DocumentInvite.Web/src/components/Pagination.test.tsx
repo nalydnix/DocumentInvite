@@ -74,6 +74,15 @@ describe('Pagination', () => {
     expect(screen.getByText('Page 3 of 3')).toBeInTheDocument();
   });
 
+  it('keeps the rows-per-page label and select on one line', () => {
+    setup();
+
+    const select = screen.getByRole('combobox');
+    expect(select.closest('label')).toHaveClass('whitespace-nowrap');
+    expect(select).toHaveClass('shrink-0', 'w-20');
+    expect(select).not.toHaveClass('w-full');
+  });
+
   it('renders nothing when there are no rows', () => {
     setup({ total: 0, page: 1 });
 
