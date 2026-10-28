@@ -34,10 +34,10 @@ export function Pagination({
         Showing {from}–{to} of {total}
       </p>
       <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
-        <label className="flex items-center gap-2 text-sm text-ink-muted">
+        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-ink-muted">
           Rows per page
           <select
-            className={`${inputClass} mt-0 w-auto`}
+            className={`${inputClass} mt-0 w-auto shrink-0`}
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
           >
