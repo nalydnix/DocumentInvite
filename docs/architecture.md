@@ -134,7 +134,6 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 
 - The seeder (idempotent, enabled through `Demo:Enabled`) creates an Admin and an Auditor account, plus a LoanOfficer. Their credentials come from configuration and are shown on the sign-in page only when demo mode is on. It also creates both seeded templates (an SBA 7(a) business acquisition checklist and a commercial real estate purchase checklist), sample contacts and three loans: one just sent, one partly uploaded with one rejection, and one fully approved, with sample PDFs.
 - The Admin "Reset demo data" action deletes and re-seeds the domain data and blobs, but keeps the audit log, which is append-only. The reset is recorded as an audit event.
-- A dismissible "How to try this" panel walks through the demo: sign in, open the Outbox, open a portal link as the borrower, review as the lender, then check the audit log.
 
 ## 12. API surface (summary)
 
