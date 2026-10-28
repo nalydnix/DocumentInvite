@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ROLES, type Role } from '../auth/AuthContext';
 import { Card } from '../components/Card';
 import { ErrorList, Field, inputClass, primaryButtonClass, secondaryButtonClass } from '../components/Field';
+import { Pagination } from '../components/Pagination';
 import { ApiError, apiFetch } from '../lib/api';
+import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 
 export interface UserSummary {
   id: string;
@@ -222,7 +224,14 @@ function UserRow({ user }: { user: UserSummary }) {
 }
 
 export function UsersPage() {
-  const users = useQuery({ queryKey: ['users'], queryFn: () => apiFetch<UserSummary[]>('/api/users') });
+  const paging = usePaging();
+  const users = useQuery({
+    queryKey: ['users', paging.page, paging.pageSize],
+    queryFn: () => apiFetch<PagedResponse<UserSummary>>(`/api/users?${paging.params()}`),
+    placeholderData: keepPreviousData,
+  });
+  const data = users.data;
+  useClampPage(paging, data?.total);
 
   return (
     <div className="space-y-6">
@@ -230,9 +239,10 @@ export function UsersPage() {
       <CreateUserForm />
       {users.isPending && <p className="text-sm text-ink-muted">Loading users...</p>}
       {users.isError && <ErrorList messages={messagesOf(users.error)} />}
-      {users.data && (
+      {data && data.items.length === 0 && <p className="text-sm text-ink-muted">No users yet.</p>}
+      {data && data.items.length > 0 && (
         <ul className="space-y-3" aria-label="Users">
-          {users.data.map((user) => (
+          {data.items.map((user) => (
             // Keyed on the saved state so the row's editors reset when the server data changes.
             <UserRow
               key={`${user.id}:${user.roles.join(',')}:${user.accessExpiresAt ?? ''}`}
@@ -240,6 +250,15 @@ export function UsersPage() {
             />
           ))}
         </ul>
+      )}
+      {data && (
+        <Pagination
+          page={paging.page}
+          pageSize={paging.pageSize}
+          total={data.total}
+          onPageChange={paging.setPage}
+          onPageSizeChange={paging.setPageSize}
+        />
       )}
     </div>
   );

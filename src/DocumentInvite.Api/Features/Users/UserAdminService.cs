@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Common;
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Features.Auth;
@@ -20,18 +21,25 @@ public sealed record UserResult(UserResponse? User, IReadOnlyDictionary<string, 
 public sealed class UserAdminService(
     UserManager<AppUser> users, AppDbContext db, IAuditLog audit, IRequestContext context, TimeProvider clock)
 {
-    public async Task<IReadOnlyList<UserResponse>> ListAsync(CancellationToken ct)
+    public async Task<PagedResponse<UserResponse>> ListAsync(PageQuery query, CancellationToken ct)
     {
-        var accounts = await users.Users.AsNoTracking().OrderBy(x => x.Email).ToListAsync(ct);
+        var page = await users.Users.AsNoTracking()
+            .OrderBy(x => x.Email).ThenBy(x => x.Id)
+            .ToPagedResponseAsync(query, u => u, ct);
+
+        // Roles are read only for the users on this page.
+        var ids = page.Items.Select(u => u.Id).ToList();
         var rolesByUser = await (
                 from link in db.UserRoles
                 join role in db.Roles on link.RoleId equals role.Id
+                where ids.Contains(link.UserId)
                 select new { link.UserId, role.Name })
             .ToListAsync(ct);
 
-        return accounts
+        var items = page.Items
             .Select(u => ToResponse(u, rolesByUser.Where(r => r.UserId == u.Id).Select(r => r.Name!).Order().ToList()))
             .ToList();
+        return new PagedResponse<UserResponse>(items, page.Total, page.Page, page.PageSize);
     }
 
     public async Task<UserResult> GetAsync(Guid id)

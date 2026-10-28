@@ -15,6 +15,8 @@ const auditor = {
 };
 const viewer = { ...auditor, id: 'v1', email: 'view@example.com', displayName: 'Vic Viewer', roles: ['Viewer'], accessExpiresAt: null };
 
+const paged = (items: unknown[], total = items.length, page = 1, pageSize = 25) => ({ items, total, page, pageSize });
+
 function signedIn() {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
   return {
@@ -25,7 +27,7 @@ function signedIn() {
 
 describe('UsersPage', () => {
   it('lists users and shows the expiry editor for auditors only', async () => {
-    mockApi({ ...signedIn(), 'GET /api/users': () => jsonResponse(200, [auditor, viewer]) });
+    mockApi({ ...signedIn(), 'GET /api/users?page=1&pageSize=25': () => jsonResponse(200, paged([auditor, viewer])) });
 
     renderApp(<UsersPage />);
 
@@ -38,7 +40,7 @@ describe('UsersPage', () => {
   it('creates a user with the chosen roles', async () => {
     const { calls } = mockApi({
       ...signedIn(),
-      'GET /api/users': () => jsonResponse(200, []),
+      'GET /api/users?page=1&pageSize=25': () => jsonResponse(200, paged([])),
       'POST /api/users': () => jsonResponse(201, viewer),
     });
     renderApp(<UsersPage />);
@@ -62,7 +64,7 @@ describe('UsersPage', () => {
   it('shows the API validation errors when creation fails', async () => {
     mockApi({
       ...signedIn(),
-      'GET /api/users': () => jsonResponse(200, []),
+      'GET /api/users?page=1&pageSize=25': () => jsonResponse(200, paged([])),
       'POST /api/users': () =>
         jsonResponse(400, { title: 'Validation', errors: { password: ['Passwords must be at least 12 characters.'] } }),
     });
@@ -80,7 +82,7 @@ describe('UsersPage', () => {
   it('saves changed roles for a user', async () => {
     const { calls } = mockApi({
       ...signedIn(),
-      'GET /api/users': () => jsonResponse(200, [viewer]),
+      'GET /api/users?page=1&pageSize=25': () => jsonResponse(200, paged([viewer])),
       'PUT /api/users/v1/roles': () => jsonResponse(200, { ...viewer, roles: ['Viewer', 'LoanOfficer'] }),
     });
     renderApp(<UsersPage />);
@@ -97,7 +99,7 @@ describe('UsersPage', () => {
   it('clears an auditor expiry date', async () => {
     const { calls } = mockApi({
       ...signedIn(),
-      'GET /api/users': () => jsonResponse(200, [auditor]),
+      'GET /api/users?page=1&pageSize=25': () => jsonResponse(200, paged([auditor])),
       'PUT /api/users/a1/access-expiry': () => jsonResponse(200, { ...auditor, accessExpiresAt: null }),
     });
     renderApp(<UsersPage />);

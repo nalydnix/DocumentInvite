@@ -156,8 +156,6 @@ All routes are under `/api` unless noted. Staff routes need a bearer token, and 
 
 Any endpoint that returns a collection must be paginated with the shared contract. Exceptions are bounded lookups (a small, fixed set such as roles or enum values) and CSV or zip exports, which are streamed.
 
-Temporary exception, tracked by its own migration issue and removed from this list when that issue merges: `GET /api/users` (unbounded, issue #32). It predates the contract, and migrating it also changes its web page and tests, so it is kept out of the foundation change to keep that focused. New endpoints must not be added to this list.
-
 - **Request**: query `page` (default 1, minimum 1) and `pageSize` (default 25, maximum 100). A query record implements `IPagedQuery` and its validator calls `Include(new PagedQueryValidator<T>())` from `Common/Paging`, so invalid values return a ProblemDetails 400. An endpoint with no filters can bind `PageQuery`.
 - **Response**: `PagedResponse<T>(Items, Total, Page, PageSize)`, serialised as `items`, `total`, `page`, `pageSize`.
 - **Ordering**: every paginated query must have a deterministic order that ends in a unique key (for example `OrderBy(LastName).ThenBy(FirstName).ThenBy(Id)`), so pages never overlap or skip rows. Build the query with that order and finish it with `ToPagedResponseAsync(query, map, ct)`.
