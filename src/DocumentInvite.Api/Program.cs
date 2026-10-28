@@ -1,6 +1,7 @@
 using DocumentInvite.Api.Common;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Files;
+using DocumentInvite.Api.Features.Gdpr;
 using DocumentInvite.Api.Features.Invites;
 using DocumentInvite.Api.Features.Loans;
 using DocumentInvite.Api.Features.Messaging;
@@ -24,6 +25,7 @@ builder.Services.AddFiles();
 builder.Services.AddPortal();
 builder.Services.AddReview();
 builder.Services.AddMessaging();
+builder.Services.AddGdpr();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
