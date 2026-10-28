@@ -119,6 +119,7 @@ describe('TemplatesPage', () => {
     expect(await screen.findByText('SBA checklist')).toBeInTheDocument();
     expect(screen.getByText('14 items')).toBeInTheDocument();
     expect(screen.getByText('Archived')).toBeInTheDocument();
+    expect(screen.queryByText('Standard')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Archive SBA checklist' }));
 
     expect(calls.some((c) => c.key === 'POST /api/templates/t1/archive')).toBe(true);
