@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ErrorList, Field, primaryButtonClass } from '../components/Field';
 import { ApiError } from '../lib/api';
+import { DemoLogins } from './DemoLogins';
 
 export function LoginPage() {
   const { state, signIn } = useAuth();
@@ -29,7 +30,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-muted px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface-muted px-4 py-6">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 rounded-card border border-surface-border bg-surface p-6 shadow-card"
@@ -59,6 +60,12 @@ export function LoginPage() {
           {busy ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
+      <DemoLogins
+        onUse={(demoEmail, demoPassword) => {
+          setEmail(demoEmail);
+          setPassword(demoPassword);
+        }}
+      />
     </div>
   );
 }
