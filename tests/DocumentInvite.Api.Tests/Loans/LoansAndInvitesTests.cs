@@ -107,25 +107,6 @@ public partial class LoansAndInvitesTests : StaffTestBase
     // ---- authorisation ----
 
     [Fact]
-    public async Task Viewer_can_read_but_not_write()
-    {
-        var officer = await OfficerAsync();
-        var contact = await CreateContactAsync(officer);
-        var loan = await CreateLoanAsync(officer);
-        var invite = (await SendAsync(officer, loan.Id, Party(contact.Id)))[0];
-        var viewer = await ClientForAsync("v@example.com", [StaffRoles.Viewer]);
-
-        (await viewer.GetAsync("/api/loans")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.GetAsync($"/api/loans/{loan.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.GetAsync($"/api/invites/{invite.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.PostAsJsonAsync("/api/loans", ValidLoan("LN-2"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PostAsJsonAsync($"/api/loans/{loan.Id}/invites", new SendInvitesRequest([Party(contact.Id)])))
-            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PostAsync($"/api/invites/{invite.Id}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PostAsync($"/api/invites/{invite.Id}/reissue", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
     public async Task Auditors_and_anonymous_callers_are_rejected()
     {
         var auditor = await ClientForAsync("aud@example.com", [StaffRoles.Auditor]);
@@ -276,7 +257,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
 
         var emails = await EmailsAsync();
         emails.Select(e => e.To).Should().BeEquivalentTo("ann@example.com", "bob@example.com");
-        emails.Should().OnlyContain(e => e.TextBody.Contains("http://localhost:5173/p/") && e.HtmlBody.Contains("/p/"));
+        emails.Should().OnlyContain(e => e.TextBody.Contains(PortalBaseUrl + "/p/") && e.HtmlBody.Contains("/p/"));
         TokenIn(emails[0]).Should().NotBe(TokenIn(emails[1]));
     }
 

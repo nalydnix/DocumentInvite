@@ -1,7 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { jsonResponse, meBody, mockApi, renderApp, resetSession, tokens } from '../test-utils';
-import { HomePage } from './HomePage';
 import { LoginPage } from './LoginPage';
 import { SettingsPage } from './SettingsPage';
 
@@ -50,38 +49,6 @@ describe('demo logins on the sign-in page', () => {
     await screen.findByRole('button', { name: 'Sign in' });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(screen.queryByRole('region', { name: 'Demo logins' })).not.toBeInTheDocument();
-  });
-});
-
-describe('How to try this panel', () => {
-  it('lists the walkthrough steps in demo mode and stays dismissed', async () => {
-    mockApi({ ...signedIn(), 'GET /api/demo/config': () => jsonResponse(200, demoOn) });
-    const view = renderApp(<HomePage />);
-
-    const panel = await screen.findByRole('region', { name: 'How to try this' });
-    const steps = panel.querySelectorAll('li');
-    expect(steps).toHaveLength(5);
-    expect(steps[0]).toHaveTextContent(/sign in/i);
-    expect(steps[1]).toHaveTextContent(/outbox/i);
-    expect(steps[2]).toHaveTextContent(/portal link/i);
-    expect(steps[3]).toHaveTextContent(/review/i);
-    expect(steps[4]).toHaveTextContent(/audit log/i);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Dismiss how to try this' }));
-    expect(screen.queryByRole('region', { name: 'How to try this' })).not.toBeInTheDocument();
-
-    view.unmount();
-    renderApp(<HomePage />);
-    await screen.findByText(/Secure document collection/);
-    expect(screen.queryByRole('region', { name: 'How to try this' })).not.toBeInTheDocument();
-  });
-
-  it('is not shown when demo mode is off', async () => {
-    mockApi({ ...signedIn(), 'GET /api/demo/config': () => jsonResponse(200, { enabled: false, logins: [] }) });
-    renderApp(<HomePage />);
-
-    await screen.findByText(/Secure document collection/);
-    expect(screen.queryByRole('region', { name: 'How to try this' })).not.toBeInTheDocument();
   });
 });
 

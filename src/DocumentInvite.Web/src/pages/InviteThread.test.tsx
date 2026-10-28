@@ -76,16 +76,6 @@ describe('InviteThread', () => {
     expect(screen.getByLabelText(/Message to Ann Lee/)).toHaveValue('Hello');
   });
 
-  it('is read-only for a viewer: no box to type in', async () => {
-    mockApi({ [URL1]: () => page([messages[1]]) });
-    renderApp(<InviteThread inviteId="i1" partyName="Ann Lee" canWrite={false} />);
-    await userEvent.setup().click(screen.getByRole('button', OPEN));
-
-    expect(await screen.findByText('Where do I upload it?')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(screen.getByText(/read this thread but not post/)).toBeInTheDocument();
-  });
-
   it('pages through a long thread', async () => {
     const older = { ...messages[1], id: 'old', body: 'An older message' };
     const { calls } = mockApi({

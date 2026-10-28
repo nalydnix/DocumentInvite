@@ -27,7 +27,6 @@ public class UserManagementTests : StaffTestBase
 
     [Theory]
     [InlineData(StaffRoles.LoanOfficer)]
-    [InlineData(StaffRoles.Viewer)]
     [InlineData(StaffRoles.Auditor)]
     public async Task Only_admins_can_use_the_user_api(string role)
     {
@@ -59,7 +58,7 @@ public class UserManagementTests : StaffTestBase
     {
         for (var i = 0; i < count; i++)
         {
-            (await admin.PostAsJsonAsync("/api/users", NewUser($"user{i:00}@example.com", StaffRoles.Viewer)))
+            (await admin.PostAsJsonAsync("/api/users", NewUser($"user{i:00}@example.com", StaffRoles.LoanOfficer)))
                 .EnsureSuccessStatusCode();
         }
     }
@@ -167,11 +166,12 @@ public class UserManagementTests : StaffTestBase
     }
 
     [Theory]
-    [InlineData("not-an-email", "Viewer")]
+    [InlineData("not-an-email", "LoanOfficer")]
     [InlineData("ok@example.com", "Wizard")]
     [InlineData("ok@example.com", "")]
     [InlineData("ok@example.com", null)]
-    [InlineData("ok@example.com", "Viewer,LoanOfficer")]
+    [InlineData("ok@example.com", "LoanOfficer,Auditor")]
+    [InlineData("ok@example.com", "Viewer")]
     public async Task Creating_a_user_validates_the_email_and_role(string email, string? role)
     {
         var admin = await AdminClientAsync();
@@ -187,12 +187,12 @@ public class UserManagementTests : StaffTestBase
         var admin = await AdminClientAsync();
 
         var onCreate = await admin.PostAsJsonAsync(
-            "/api/users", NewUser("viewer@example.com", StaffRoles.Viewer, DateTimeOffset.UtcNow.AddDays(1)));
+            "/api/users", NewUser("officer@example.com", StaffRoles.LoanOfficer, DateTimeOffset.UtcNow.AddDays(1)));
         onCreate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        var viewer = await CreateUserAsync("v2@example.com", [StaffRoles.Viewer]);
+        var officer = await CreateUserAsync("v2@example.com", [StaffRoles.LoanOfficer]);
         var onUpdate = await admin.PutAsJsonAsync(
-            $"/api/users/{viewer.Id}/access-expiry", new SetAccessExpiryRequest(DateTimeOffset.UtcNow.AddDays(1)));
+            $"/api/users/{officer.Id}/access-expiry", new SetAccessExpiryRequest(DateTimeOffset.UtcNow.AddDays(1)));
         onUpdate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -237,7 +237,7 @@ public class UserManagementTests : StaffTestBase
     public async Task Setting_a_missing_or_unknown_role_is_a_validation_problem(string? role)
     {
         var admin = await AdminClientAsync();
-        var user = await CreateUserAsync("v3@example.com", [StaffRoles.Viewer]);
+        var user = await CreateUserAsync("v3@example.com", [StaffRoles.LoanOfficer]);
 
         var response = await admin.PutAsJsonAsync($"/api/users/{user.Id}/role", new SetRoleRequest(role));
 
@@ -249,9 +249,9 @@ public class UserManagementTests : StaffTestBase
     public async Task Several_roles_in_a_request_are_rejected()
     {
         var admin = await AdminClientAsync();
-        var user = await CreateUserAsync("v4@example.com", [StaffRoles.Viewer]);
+        var user = await CreateUserAsync("v4@example.com", [StaffRoles.LoanOfficer]);
 
-        var response = await admin.PutAsJsonAsync($"/api/users/{user.Id}/role", new { roles = new[] { "Viewer", "Auditor" } });
+        var response = await admin.PutAsJsonAsync($"/api/users/{user.Id}/role", new { roles = new[] { "LoanOfficer", "Auditor" } });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -261,8 +261,7 @@ public class UserManagementTests : StaffTestBase
     {
         var admin = await AdminClientAsync();
         var both = await CreateUserAsync("m1@example.com", [StaffRoles.Auditor, StaffRoles.LoanOfficer], DateTimeOffset.UtcNow.AddDays(5));
-        var low = await CreateUserAsync("m2@example.com", [StaffRoles.Auditor, StaffRoles.Viewer]);
-        var top = await CreateUserAsync("m3@example.com", [StaffRoles.Viewer, StaffRoles.Admin, StaffRoles.LoanOfficer]);
+        var top = await CreateUserAsync("m3@example.com", [StaffRoles.Admin, StaffRoles.LoanOfficer]);
         var single = await CreateUserAsync("m4@example.com", [StaffRoles.Auditor]);
 
         // The list shows the highest role even before the data is migrated.
@@ -280,10 +279,35 @@ public class UserManagementTests : StaffTestBase
         var users = check.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         async Task<string[]> RolesOf(Guid id) => (await users.GetRolesAsync((await users.FindByIdAsync(id.ToString()))!)).ToArray();
         (await RolesOf(both.Id)).Should().Equal(StaffRoles.LoanOfficer);
-        (await RolesOf(low.Id)).Should().Equal(StaffRoles.Viewer);
         (await RolesOf(top.Id)).Should().Equal(StaffRoles.Admin);
         (await RolesOf(single.Id)).Should().Equal(StaffRoles.Auditor);
         (await users.FindByIdAsync(both.Id.ToString()))!.AccessExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task The_migration_moves_viewer_users_to_loan_officer_and_leaves_other_users_alone()
+    {
+        var viewerRoleId = new Guid("A1000000-0000-0000-0000-000000000003");
+        var viewer = await CreateUserAsync("rv1@example.com", [StaffRoles.Auditor]);
+        var other = await CreateUserAsync("rv2@example.com", [StaffRoles.Auditor]);
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // The Viewer role no longer exists in the model, so recreate it as an upgraded database would have it.
+            await db.Database.ExecuteSqlAsync(
+                $"INSERT INTO AspNetRoles (Id, Name, NormalizedName, ConcurrencyStamp) VALUES ({viewerRoleId}, 'Viewer', 'VIEWER', 'x')");
+            await db.Database.ExecuteSqlAsync(
+                $"UPDATE AspNetUserRoles SET RoleId = {viewerRoleId} WHERE UserId = {viewer.Id}");
+            await db.Database.ExecuteSqlRawAsync(RemoveViewerRole.ReassignViewersSql);
+            await db.Database.ExecuteSqlAsync($"DELETE FROM AspNetRoles WHERE Id = {viewerRoleId}");
+        }
+
+        using var check = Factory.Services.CreateScope();
+        var users = check.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        async Task<string[]> RolesOf(Guid id) => (await users.GetRolesAsync((await users.FindByIdAsync(id.ToString()))!)).ToArray();
+        (await RolesOf(viewer.Id)).Should().Equal(StaffRoles.LoanOfficer);
+        (await RolesOf(other.Id)).Should().Equal(StaffRoles.Auditor);
     }
 
     [Fact]
@@ -292,7 +316,7 @@ public class UserManagementTests : StaffTestBase
         var admin = await AdminClientAsync();
         var me = (await admin.GetFromJsonAsync<MeResponse>("/api/me"))!;
 
-        var response = await admin.PutAsJsonAsync($"/api/users/{me.Id}/role", new SetRoleRequest(StaffRoles.Viewer));
+        var response = await admin.PutAsJsonAsync($"/api/users/{me.Id}/role", new SetRoleRequest(StaffRoles.LoanOfficer));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -303,7 +327,7 @@ public class UserManagementTests : StaffTestBase
         var admin = await AdminClientAsync();
 
         (await admin.GetAsync($"/api/users/{Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await admin.PutAsJsonAsync($"/api/users/{Guid.NewGuid()}/role", new SetRoleRequest(StaffRoles.Viewer)))
+        (await admin.PutAsJsonAsync($"/api/users/{Guid.NewGuid()}/role", new SetRoleRequest(StaffRoles.LoanOfficer)))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await admin.PutAsJsonAsync($"/api/users/{Guid.NewGuid()}/access-expiry", new SetAccessExpiryRequest(null)))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -315,7 +339,7 @@ public class UserManagementTests : StaffTestBase
         var admin = await AdminClientAsync();
         var created = await (await admin.PostAsJsonAsync("/api/users", NewUser(expiry: DateTimeOffset.UtcNow.AddDays(3))))
             .Content.ReadFromJsonAsync<UserResponse>();
-        await admin.PutAsJsonAsync($"/api/users/{created!.Id}/role", new SetRoleRequest(StaffRoles.Viewer));
+        await admin.PutAsJsonAsync($"/api/users/{created!.Id}/role", new SetRoleRequest(StaffRoles.LoanOfficer));
 
         var events = (await AuditEventsAsync()).Where(e => e.TargetId == created.Id).ToList();
 
@@ -324,7 +348,7 @@ public class UserManagementTests : StaffTestBase
         events.Should().OnlyContain(e => e.ActorId != null && e.TargetType == "user");
         events.Should().OnlyContain(e =>
             !e.DetailsJson.Contains("example.com") && !e.DetailsJson.Contains("New Person"));
-        events[1].DetailsJson.Should().Contain("\"roleViewer\":\"Added\"");
+        events[1].DetailsJson.Should().Contain("\"roleLoanOfficer\":\"Added\"");
     }
 
     [Fact]

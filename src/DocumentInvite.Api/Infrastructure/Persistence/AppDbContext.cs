@@ -13,7 +13,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     [
         (StaffRoles.Admin, new Guid("a1000000-0000-0000-0000-000000000001")),
         (StaffRoles.LoanOfficer, new Guid("a1000000-0000-0000-0000-000000000002")),
-        (StaffRoles.Viewer, new Guid("a1000000-0000-0000-0000-000000000003")),
         (StaffRoles.Auditor, new Guid("a1000000-0000-0000-0000-000000000004")),
     ];
 

@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { HomeRedirect } from './auth/HomeRedirect';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { AuditPage } from './pages/AuditPage';
 import { ContactFormPage } from './pages/ContactFormPage';
 import { ContactsPage } from './pages/ContactsPage';
-import { HomePage } from './pages/HomePage';
 import { LoanDetailPage } from './pages/LoanDetailPage';
 import { LoanFormPage } from './pages/LoanFormPage';
 import { LoansPage } from './pages/LoansPage';
@@ -30,12 +30,12 @@ export default function App() {
             <Route path="/p/:token" element={<PortalPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
-                <Route index element={<HomePage />} />
+                <Route index element={<HomeRedirect />} />
 
                 <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer']} />}>
                   <Route path="outbox" element={<OutboxPage />} />
                 </Route>
-                <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer', 'Viewer']} />}>
+                <Route element={<ProtectedRoute roles={['Admin', 'LoanOfficer']} />}>
                   <Route path="templates" element={<TemplatesPage />} />
                   <Route path="templates/new" element={<TemplateEditorPage />} />
                   <Route path="templates/:id" element={<TemplateEditorPage />} />

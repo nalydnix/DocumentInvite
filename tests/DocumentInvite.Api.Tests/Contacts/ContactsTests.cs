@@ -45,20 +45,6 @@ public class ContactsTests : StaffTestBase
     }
 
     [Fact]
-    public async Task Viewer_can_read_but_not_write()
-    {
-        var officer = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
-        var contact = await SeedAsync(officer, Valid());
-        var viewer = await ClientForAsync("v@example.com", [StaffRoles.Viewer]);
-
-        (await viewer.GetAsync("/api/contacts")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.GetAsync($"/api/contacts/{contact.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await viewer.PostAsJsonAsync("/api/contacts", Valid())).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PutAsJsonAsync($"/api/contacts/{contact.Id}", Valid(first: "X")))
-            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
     public async Task Auditor_cannot_use_the_contact_api()
     {
         var auditor = await ClientForAsync("aud@example.com", [StaffRoles.Auditor]);
@@ -297,10 +283,10 @@ public class ContactsTests : StaffTestBase
     public async Task Rejected_requests_write_no_audit_event()
     {
         var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
-        var viewer = await ClientForAsync("v@example.com", [StaffRoles.Viewer]);
+        var auditor = await ClientForAsync("a@example.com", [StaffRoles.Auditor]);
 
         await client.PostAsJsonAsync("/api/contacts", Valid(email: "bad"));
-        await viewer.PostAsJsonAsync("/api/contacts", Valid());
+        await auditor.PostAsJsonAsync("/api/contacts", Valid());
 
         (await AuditEventsAsync()).Should().NotContain(e => e.TargetType == "contact");
     }

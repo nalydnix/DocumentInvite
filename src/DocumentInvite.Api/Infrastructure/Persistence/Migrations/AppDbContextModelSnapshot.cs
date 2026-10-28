@@ -66,13 +66,6 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
-                            Id = new Guid("a1000000-0000-0000-0000-000000000003"),
-                            ConcurrencyStamp = "a1000000-0000-0000-0000-000000000003",
-                            Name = "Viewer",
-                            NormalizedName = "VIEWER"
-                        },
-                        new
-                        {
                             Id = new Guid("a1000000-0000-0000-0000-000000000004"),
                             ConcurrencyStamp = "a1000000-0000-0000-0000-000000000004",
                             Name = "Auditor",

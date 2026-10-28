@@ -68,10 +68,12 @@ Ports are never hard-coded, so multiple instances can run at once.
 - Web port: `npm run dev -- --port 5174`, or set `VITE_PORT=5174`.
 - Point the dev proxy at the matching API with `VITE_API_PROXY_TARGET=http://localhost:5301` (`VITE_API_BASE_URL` is also accepted as the proxy target). In development the browser always calls relative `/api` URLs and the dev server proxies them to the API, so no CORS configuration is needed. `VITE_API_BASE_URL` only takes effect in production builds. Put these in an untracked `src/DocumentInvite.Web/.env.local`.
 
+- E-mail link origin: links in e-mails (portal and loan links) are built from `Portal__BaseUrl`. It has no default and must be the origin the web app is served from, for example `Portal__BaseUrl=http://localhost:5174` for the second instance below. Sending an e-mail fails with a clear error while it is unset. Set it per instance as an environment variable (or with `dotnet user-secrets`).
+
 Example for a second instance:
 
 ```bash
-ASPNETCORE_URLS=http://localhost:5301 dotnet run --project src/DocumentInvite.Api
+ASPNETCORE_URLS=http://localhost:5301 Portal__BaseUrl=http://localhost:5174 dotnet run --project src/DocumentInvite.Api
 VITE_PORT=5174 VITE_API_PROXY_TARGET=http://localhost:5301 npm run dev
 ```
 
@@ -82,7 +84,7 @@ Migrations create the `audit_writer` database role: `SELECT` and `INSERT` are gr
 ## Staff authentication
 
 - Sign-in and token refresh are served at `POST /api/auth/login` and `POST /api/auth/refresh` (ASP.NET Core Identity bearer tokens). Registration, password reset and e-mail confirmation are disabled; Admins create users under `/api/users`.
-- Apply the migrations (`dotnet ef database update --project src/DocumentInvite.Api`) to create the Identity tables and seed the roles Admin, LoanOfficer, Viewer and Auditor.
+- Apply the migrations (`dotnet ef database update --project src/DocumentInvite.Api`) to create the Identity tables and seed the roles Admin, LoanOfficer and Auditor.
 - The first Admin is created on startup when `Bootstrap:AdminEmail` and `Bootstrap:AdminPassword` are configured (`Bootstrap__AdminEmail` and `Bootstrap__AdminPassword` as environment variables) and no Admin exists yet. `appsettings.Development.json` sets `admin@documentinvite.local` for local use; production must supply its own values through secrets and remove them after the first start.
 
 ## Demo mode
@@ -93,8 +95,7 @@ Set `Demo:Enabled=true` to seed a demo on startup (idempotent). Credentials come
 Demo__Enabled=true
 Demo__Accounts__Admin__Email / Demo__Accounts__Admin__Password
 Demo__Accounts__LoanOfficer__Email / Demo__Accounts__LoanOfficer__Password
-Demo__Accounts__Viewer__Email / Demo__Accounts__Viewer__Password
 Demo__Accounts__Auditor__Email / Demo__Accounts__Auditor__Password
 ```
 
-Passwords must meet the 12-character policy. Development settings enable it with local-only accounts. The seeder creates the four accounts, three sample contacts and loans (DEMO-1001 just sent, DEMO-1002 partly uploaded with one rejected item, DEMO-1003 fully approved) with sample PDFs, the matching emails in the Outbox and audit events. The sign-in page shows the Admin and Auditor logins (from `GET /api/demo/config`) only while demo mode is on. Admins can use Settings, Demo data, "Reset demo data" (`POST /api/demo/reset`) to delete and re-seed loans, contacts, emails and blobs; the audit log is kept and the reset is audited. A dismissible "How to try this" panel on the home page walks through the demo.
+Passwords must meet the 12-character policy. Development settings enable it with local-only accounts. The seeder creates the three accounts, three sample contacts and loans (DEMO-1001 just sent, DEMO-1002 partly uploaded with one rejected item, DEMO-1003 fully approved) with sample PDFs, the matching emails in the Outbox and audit events. The sign-in page shows the Admin and Auditor logins (from `GET /api/demo/config`) only while demo mode is on. Admins can use Settings, Demo data, "Reset demo data" (`POST /api/demo/reset`) to delete and re-seed loans, contacts, emails and blobs; the audit log is kept and the reset is audited.

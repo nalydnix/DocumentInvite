@@ -141,13 +141,11 @@ public class ExportTests : StaffTestBase
     }
 
     [Fact]
-    public async Task Export_is_refused_for_viewers_auditors_and_anonymous_callers_without_auditing()
+    public async Task Export_is_refused_for_auditors_and_anonymous_callers_without_auditing()
     {
         var loanId = await SeedLoanAsync();
-        var viewer = await ClientAsync(StaffRoles.Viewer);
         var auditor = await ClientAsync(StaffRoles.Auditor);
 
-        (await viewer.GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await auditor.GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await NewClient().GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await AuditEventsAsync()).Should().NotContain(e => e.Action == "loan.exported");
