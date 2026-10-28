@@ -1,4 +1,5 @@
 using DocumentInvite.Api.Domain;
+using DocumentInvite.Api.Features.Portal;
 using FluentValidation;
 
 namespace DocumentInvite.Api.Features.Invites;
@@ -43,6 +44,7 @@ public sealed record InviteResponse(
     DateTimeOffset TokenExpiresAt,
     DateTimeOffset? RevokedAt,
     CollectionStatus Status,
+    bool HasPassword,
     IReadOnlyList<InviteItemResponse> Items);
 
 /// <summary>One item to request. The officer may have edited the name and instructions copied from a template.</summary>
@@ -55,11 +57,13 @@ public sealed record InviteItemRequest(
     bool IsRequired);
 
 /// <param name="ReminderIntervalDays">Omit to use the default from the settings.</param>
+/// <param name="Password">Optional portal password. Stored hashed, never returned.</param>
 public sealed record SendPartyRequest(
     Guid? ContactId,
     DateOnly? DueDate,
     int? ReminderIntervalDays,
-    IReadOnlyList<InviteItemRequest>? Items);
+    IReadOnlyList<InviteItemRequest>? Items,
+    string? Password = null);
 
 public sealed record SendInvitesRequest(IReadOnlyList<SendPartyRequest>? Parties);
 
@@ -92,6 +96,9 @@ public sealed class SendPartyRequestValidator : AbstractValidator<SendPartyReque
     {
         RuleFor(x => x.ContactId).NotNull().NotEqual(Guid.Empty);
         RuleFor(x => x.DueDate).NotNull();
+        RuleFor(x => x.Password).Length(PortalLimits.MinPasswordLength, PortalLimits.MaxPasswordLength)
+            .When(x => !string.IsNullOrEmpty(x.Password))
+            .WithMessage($"The portal password must be {PortalLimits.MinPasswordLength} to {PortalLimits.MaxPasswordLength} characters.");
         RuleFor(x => x.ReminderIntervalDays).InclusiveBetween(1, MaxReminderIntervalDays)
             .When(x => x.ReminderIntervalDays is not null);
         RuleFor(x => x.Items).NotNull().Must(i => i is { Count: > 0 })

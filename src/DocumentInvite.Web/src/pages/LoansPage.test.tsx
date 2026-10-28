@@ -40,6 +40,7 @@ const annInvite: Invite = {
   tokenExpiresAt: '2027-03-03T00:00:00Z',
   revokedAt: null,
   status: 'Submitted',
+  hasPassword: false,
   items: [
     {
       id: 'it1',
@@ -366,6 +367,7 @@ describe('LoanDetailPage', () => {
           contactId: 'c1',
           dueDate: '2027-02-01',
           reminderIntervalDays: 3,
+          password: null,
           items: [
             {
               name: 'Business tax return',
@@ -380,6 +382,28 @@ describe('LoanDetailPage', () => {
       ],
     });
     expect(await screen.findByRole('status')).toHaveTextContent('Invites sent');
+  });
+
+  it('sends the optional portal password with the party', async () => {
+    const { calls } = mockApi({
+      ...routes(['LoanOfficer'], { ...loan, invites: [] }),
+      'POST /api/loans/l1/invites': () => jsonResponse(201, [annInvite]),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
+    });
+    renderRoutes('/loans/l1');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Add party' }));
+    await user.selectOptions(screen.getByLabelText('Party 1'), 'c1');
+    await user.selectOptions(screen.getByLabelText('Template'), 't1');
+    await screen.findByLabelText('Name of Tax return');
+    await user.type(screen.getByLabelText('Due date'), '2027-02-01');
+    await user.type(screen.getByLabelText(/Portal password/), 'correct-horse');
+    await user.click(screen.getByRole('button', { name: 'Send invites' }));
+
+    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/loans/l1/invites')).toBe(true));
+    const body = JSON.parse(calls.find((c) => c.key === 'POST /api/loans/l1/invites')!.init!.body as string);
+    expect(body.parties[0].password).toBe('correct-horse');
   });
 
   it('does not offer a party that was already invited', async () => {

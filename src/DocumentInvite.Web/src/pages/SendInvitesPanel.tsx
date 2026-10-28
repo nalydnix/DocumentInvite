@@ -43,6 +43,7 @@ interface DraftParty {
   contactId: string;
   dueDate: string;
   reminder: string;
+  password: string;
   templateId: string;
   items: DraftItem[];
 }
@@ -78,6 +79,7 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
             contactId: party.contactId,
             dueDate: party.dueDate,
             reminderIntervalDays: party.reminder.trim() === '' ? null : Number(party.reminder),
+            password: party.password === '' ? null : party.password,
             items: party.items
               .filter((item) => item.selected)
               .map(({ name, kind, instructions, allowMultiple, fieldType, isRequired }) => ({
@@ -220,6 +222,23 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
                   onChange={(e) => update(party.key, { reminder: e.target.value })}
                 />
               </label>
+              <label className="block text-sm font-medium text-ink sm:col-span-2">
+                Portal password (optional)
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={128}
+                  className={inputClass}
+                  aria-describedby={`password-help-${party.key}`}
+                  value={party.password}
+                  onChange={(e) => update(party.key, { password: e.target.value })}
+                />
+                <span id={`password-help-${party.key}`} className="mt-1 block text-xs font-normal text-ink-muted">
+                  If set, the party must enter it after opening the link. Share it separately from the email. 8 to 128
+                  characters.
+                </span>
+              </label>
             </div>
 
             {party.items.length > 0 && (
@@ -283,7 +302,7 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
             onClick={() =>
               setParties((current) => [
                 ...current,
-                { key: nextKey(), contactId: '', dueDate: '', reminder: '', templateId: '', items: [] },
+                { key: nextKey(), contactId: '', dueDate: '', reminder: '', password: '', templateId: '', items: [] },
               ])
             }
           >

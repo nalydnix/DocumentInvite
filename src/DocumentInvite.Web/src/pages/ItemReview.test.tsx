@@ -66,6 +66,7 @@ function loanWith(items: InviteItem[]): Loan {
     tokenExpiresAt: '2027-03-03T00:00:00Z',
     revokedAt: null,
     status: 'Submitted',
+    hasPassword: false,
     items,
   };
   return {

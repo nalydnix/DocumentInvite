@@ -8,4 +8,10 @@ public interface IRequestContext
     string CorrelationId { get; }
     ActorType ActorType { get; }
     Guid? ActorId { get; }
+
+    /// <summary>
+    /// Attributes the rest of this request to a party (by contact id). Used while a portal session is
+    /// being created, before the caller holds a session token.
+    /// </summary>
+    void ActAsParty(Guid contactId);
 }

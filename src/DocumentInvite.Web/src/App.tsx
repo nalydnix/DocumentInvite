@@ -15,6 +15,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { OutboxPage } from './pages/OutboxPage';
+import { PortalPage } from './portal/PortalPage';
 import { UsersPage } from './pages/UsersPage';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -26,6 +27,7 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/p/:token" element={<PortalPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route index element={<HomePage />} />

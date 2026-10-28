@@ -11,4 +11,10 @@ public sealed class BlobOptions
 
     /// <summary>Creates the private container on first use. Turn off when it is provisioned separately.</summary>
     public bool CreateContainerIfMissing { get; set; } = true;
+
+    /// <summary>
+    /// Web origins allowed to upload straight to storage. When set, the API applies the CORS rule at startup (for Azurite).
+    /// Leave empty when the storage account is provisioned separately.
+    /// </summary>
+    public string[] CorsAllowedOrigins { get; set; } = [];
 }
