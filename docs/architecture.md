@@ -132,7 +132,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 
 ## 11. Demo mode
 
-- The seeder (idempotent, enabled through `Demo:Enabled`) creates an Admin and an Auditor account, plus a LoanOfficer. Their credentials come from configuration and are shown on the sign-in page only when demo mode is on. It also creates both seeded templates (an SBA 7(a) business acquisition checklist and a commercial real estate purchase checklist), sample contacts and three loans: one just sent, one partly uploaded with one rejection, and one fully approved, with sample PDFs.
+- The seeder (idempotent, enabled through `Demo:Enabled`) creates an Admin and an Auditor account, plus a LoanOfficer. Their credentials come from configuration and are all shown (Admin, LoanOfficer and Auditor, with email and password) on the sign-in page, returned by `GET /api/demo/config`, only when demo mode is on. It also creates both seeded templates (an SBA 7(a) business acquisition checklist and a commercial real estate purchase checklist), sample contacts and three loans: one just sent, one partly uploaded with one rejection, and one fully approved, with sample PDFs.
 - The Admin "Reset demo data" action deletes and re-seeds the domain data and blobs, but keeps the audit log, which is append-only. The reset is recorded as an audit event.
 
 ## 12. API surface (summary)

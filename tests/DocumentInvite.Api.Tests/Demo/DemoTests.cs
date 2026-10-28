@@ -63,7 +63,7 @@ public class DemoSeedingTests : DemoTestBase
     protected override bool DemoEnabled => true;
 
     [Fact]
-    public async Task Seeding_creates_the_three_accounts_and_the_sign_in_page_shows_admin_and_auditor_only()
+    public async Task Seeding_creates_the_three_accounts_and_the_sign_in_page_shows_all_three()
     {
         _ = Factory.Services; // starts the host, which seeds
         await SignInAsync(AdminEmail, AdminPassword);
@@ -72,7 +72,7 @@ public class DemoSeedingTests : DemoTestBase
 
         var config = await NewClient().GetFromJsonAsync<DemoConfigResponse>("/api/demo/config");
         config!.Enabled.Should().BeTrue();
-        config.Logins.Select(l => l.Role).Should().BeEquivalentTo(["Admin", "Auditor"]);
+        config.Logins.Select(l => l.Role).Should().BeEquivalentTo(["Admin", "LoanOfficer", "Auditor"]);
         config.Logins.Single(l => l.Role == "Admin").Should().Be(new DemoLogin("Admin", AdminEmail, AdminPassword));
     }
 
