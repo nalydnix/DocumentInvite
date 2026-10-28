@@ -27,9 +27,9 @@ public class UsersController(UserAdminService service) : ControllerBase
             : ToActionResult(result);
     }
 
-    [HttpPut("{id:guid}/roles")]
-    public async Task<IActionResult> SetRoles(Guid id, SetRolesRequest request, CancellationToken ct) =>
-        ToActionResult(await service.SetRolesAsync(id, request, ct));
+    [HttpPut("{id:guid}/role")]
+    public async Task<IActionResult> SetRole(Guid id, SetRoleRequest request, CancellationToken ct) =>
+        ToActionResult(await service.SetRoleAsync(id, request, ct));
 
     [HttpPut("{id:guid}/access-expiry")]
     public async Task<IActionResult> SetAccessExpiry(Guid id, SetAccessExpiryRequest request, CancellationToken ct) =>
