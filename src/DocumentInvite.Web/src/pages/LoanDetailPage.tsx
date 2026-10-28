@@ -1,9 +1,9 @@
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { hasAnyRole, useAuth } from '../auth/AuthContext';
-import { ErrorList, secondaryButtonClass } from '../components/Field';
+import { ErrorList, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { StatusBadge } from '../components/StatusBadge';
-import { ApiError, apiFetch } from '../lib/api';
+import { ApiError, apiDownload, apiFetch } from '../lib/api';
 import { partyLabel } from './contacts';
 import { formatAmount, formatDate, LOAN_WRITER_ROLES, type Invite, type Loan } from './loans';
 import { ItemReview } from './ItemReview';
@@ -97,6 +97,19 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
 
 export function LoanDetailPage() {
   const { id } = useParams();
+  const exportApproved = useMutation({
+    mutationFn: async (reference: string) => {
+      const blob = await apiDownload(`/api/loans/${id}/export`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${reference}-approved.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    },
+  });
   const { state } = useAuth();
   const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, LOAN_WRITER_ROLES);
   const loan = useQuery({ queryKey: ['loan', id], queryFn: () => apiFetch<Loan>(`/api/loans/${id}`) });
@@ -125,11 +138,24 @@ export function LoanDetailPage() {
           <h1 className="text-xl font-semibold text-ink">
             {data.reference} &middot; {data.name}
           </h1>
-          <StatusBadge status={data.status} />
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusBadge status={data.status} />
+            {canWrite && (
+              <button
+                type="button"
+                className={primaryButtonClass}
+                disabled={exportApproved.isPending}
+                onClick={() => exportApproved.mutate(data.reference)}
+              >
+                {exportApproved.isPending ? 'Preparing zip...' : 'Download approved'}
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-sm text-ink-muted">
           {data.loanType} &middot; {formatAmount(data.amount)}
         </p>
+        <ErrorList messages={messagesOf(exportApproved.error)} />
       </div>
 
       <section className="space-y-3">
