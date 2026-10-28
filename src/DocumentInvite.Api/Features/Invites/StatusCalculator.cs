@@ -36,8 +36,8 @@ public static class StatusCalculator
     }
 
     /// <summary>
-    /// Derived from the statuses of the loan's active (not revoked) invites: Completed when all are
-    /// Completed, Submitted when all are Submitted or Completed, Sent when all are Sent (or there
+    /// Derived from the statuses of the loan's active (not revoked) invites: Ready to complete when all
+    /// are Completed (the loan only becomes Completed through the explicit complete action), Submitted when all are Submitted or Completed, Sent when all are Sent (or there
     /// are none), otherwise In progress.
     /// </summary>
     public static CollectionStatus ForLoan(IReadOnlyCollection<CollectionStatus> activeInvites)
@@ -49,7 +49,7 @@ public static class StatusCalculator
 
         if (activeInvites.All(s => s == CollectionStatus.Completed))
         {
-            return CollectionStatus.Completed;
+            return CollectionStatus.ReadyToComplete;
         }
 
         if (activeInvites.All(s => s is CollectionStatus.Submitted or CollectionStatus.Completed))
@@ -61,11 +61,11 @@ public static class StatusCalculator
     }
 }
 
-/// <summary>Applies <see cref="StatusCalculator"/> to loaded entities and stamps <c>CompletedAt</c>.</summary>
+/// <summary>Applies <see cref="StatusCalculator"/> to loaded entities. <c>CompletedAt</c> is set only by the complete action.</summary>
 public static class StatusRecalculator
 {
     /// <summary>Recalculates every invite of the loan (items must be loaded) and then the loan itself.</summary>
-    public static void Apply(Loan loan, DateTimeOffset now)
+    public static void Apply(Loan loan)
     {
         foreach (var invite in loan.Invites)
         {
@@ -74,16 +74,9 @@ public static class StatusRecalculator
                 invite.PortalOpenedAt is not null);
         }
 
-        loan.Status = StatusCalculator.ForLoan(
-            loan.Invites.Where(i => i.RevokedAt is null).Select(i => i.Status).ToList());
-
-        if (loan.Status == CollectionStatus.Completed)
-        {
-            loan.CompletedAt ??= now;
-        }
-        else
-        {
-            loan.CompletedAt = null;
-        }
+        // A completed loan is locked: it stays Completed until it is explicitly reopened.
+        loan.Status = loan.CompletedAt is not null
+            ? CollectionStatus.Completed
+            : StatusCalculator.ForLoan(loan.Invites.Where(i => i.RevokedAt is null).Select(i => i.Status).ToList());
     }
 }

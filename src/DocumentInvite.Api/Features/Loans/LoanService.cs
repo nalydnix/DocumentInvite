@@ -111,6 +111,82 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
         return LoanResult.Ok(ToResponse(loan, new Dictionary<Guid, Contact>()));
     }
 
+    /// <summary>Stamps <c>CompletedAt</c> and locks the loan. Allowed only when every item is approved.</summary>
+    public async Task<LoanResult> CompleteAsync(Guid id, CancellationToken ct)
+    {
+        var loan = await LoadForUpdateAsync(id, ct);
+        if (loan is null)
+        {
+            return LoanResult.Missing();
+        }
+
+        if (loan.CompletedAt is not null)
+        {
+            return LoanResult.Refused("The loan is already completed.");
+        }
+
+        StatusRecalculator.Apply(loan);
+        if (loan.Status != CollectionStatus.ReadyToComplete)
+        {
+            return LoanResult.Refused("The loan can only be completed when every item on every invite is approved.");
+        }
+
+        loan.CompletedAt = clock.GetUtcNow();
+        StatusRecalculator.Apply(loan);
+        return await SaveAsync(loan, "loan.completed", ct);
+    }
+
+    /// <summary>Clears <c>CompletedAt</c>, unlocks the loan and tells each party's thread why.</summary>
+    public async Task<LoanResult> ReopenAsync(Guid id, string reason, CancellationToken ct)
+    {
+        var loan = await LoadForUpdateAsync(id, ct);
+        if (loan is null)
+        {
+            return LoanResult.Missing();
+        }
+
+        if (loan.CompletedAt is null)
+        {
+            return LoanResult.Refused("Only a completed loan can be reopened.");
+        }
+
+        var now = clock.GetUtcNow();
+        loan.CompletedAt = null;
+        StatusRecalculator.Apply(loan);
+        foreach (var invite in loan.Invites)
+        {
+            db.Messages.Add(new Message
+            {
+                InviteId = invite.Id,
+                AuthorType = MessageAuthorType.System,
+                Body = $"The loan was reopened: {reason.Trim()}",
+                IsInternal = false,
+                CreatedAt = now,
+            });
+        }
+
+        return await SaveAsync(loan, "loan.reopened", ct);
+    }
+
+    private Task<Loan?> LoadForUpdateAsync(Guid id, CancellationToken ct) =>
+        db.Loans.Include(l => l.Invites).ThenInclude(i => i.Items).AsSplitQuery().SingleOrDefaultAsync(l => l.Id == id, ct);
+
+    private async Task<LoanResult> SaveAsync(Loan loan, string action, CancellationToken ct)
+    {
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await audit.RecordAsync(action, new AuditTarget("loan", loan.Id), null, ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return LoanResult.Refused("The loan was changed by someone else. Reload it and try again.");
+        }
+
+        return await GetAsync(loan.Id, ct);
+    }
+
     private static LoanSummaryResponse ToSummary(
         Loan l, int partyCount, int total, int approved, DateOnly? dueDate, bool overdue) => new(
         l.Id, l.Reference, l.Name, l.Amount, l.LoanType, l.Status, l.CreatedAt, l.CompletedAt, partyCount,

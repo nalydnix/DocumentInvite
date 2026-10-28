@@ -1,6 +1,6 @@
 import type { PartyType } from './contacts';
 
-export type CollectionStatus = 'Sent' | 'InProgress' | 'Submitted' | 'Completed';
+export type CollectionStatus = 'Sent' | 'InProgress' | 'Submitted' | 'Completed' | 'ReadyToComplete';
 export type ItemKind = 'FileUpload' | 'FormField';
 export type FieldType = 'Text' | 'Number' | 'Date' | 'YesNo';
 export type RequestItemStatus = 'Outstanding' | 'Submitted' | 'Approved' | 'Rejected';
@@ -10,6 +10,7 @@ export const STATUS_LABELS: Record<CollectionStatus, string> = {
   InProgress: 'In progress',
   Submitted: 'Submitted',
   Completed: 'Completed',
+  ReadyToComplete: 'Ready to complete',
 };
 
 export const STATUSES = Object.keys(STATUS_LABELS) as CollectionStatus[];

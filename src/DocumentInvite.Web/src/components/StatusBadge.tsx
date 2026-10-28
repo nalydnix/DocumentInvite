@@ -5,6 +5,7 @@ const STYLES: Record<CollectionStatus, string> = {
   InProgress: 'bg-amber-50 text-amber-700',
   Submitted: 'bg-brand-50 text-brand-700',
   Completed: 'bg-green-50 text-green-700',
+  ReadyToComplete: 'bg-green-50 text-green-700',
 };
 
 export function StatusBadge({ status }: { status: CollectionStatus }) {

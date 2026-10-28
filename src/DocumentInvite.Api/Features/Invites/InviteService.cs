@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common;
 using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Audit;
 using DocumentInvite.Api.Features.Outbox;
@@ -49,6 +50,11 @@ public sealed class InviteService(
         if (loan is null)
         {
             return InviteResult<IReadOnlyList<InviteResponse>>.Missing();
+        }
+
+        if (loan.CompletedAt is not null)
+        {
+            return InviteResult<IReadOnlyList<InviteResponse>>.Refused(LoanLock.Message);
         }
 
         var parties = request.Parties!;
@@ -123,7 +129,7 @@ public sealed class InviteService(
             created.Add((invite, contacts[invite.ContactId], token));
         }
 
-        StatusRecalculator.Apply(loan, now);
+        StatusRecalculator.Apply(loan);
 
         try
         {
@@ -165,6 +171,11 @@ public sealed class InviteService(
             return InviteResult<InviteResponse>.Missing();
         }
 
+        if (loan.CompletedAt is not null)
+        {
+            return InviteResult<InviteResponse>.Refused(LoanLock.Message);
+        }
+
         if (invite.RevokedAt is not null)
         {
             return InviteResult<InviteResponse>.Refused("The invite is already revoked.");
@@ -172,7 +183,7 @@ public sealed class InviteService(
 
         var now = clock.GetUtcNow();
         invite.RevokedAt = now;
-        StatusRecalculator.Apply(loan, now);
+        StatusRecalculator.Apply(loan);
 
         try
         {
@@ -204,6 +215,11 @@ public sealed class InviteService(
             return InviteResult<InviteResponse>.Missing();
         }
 
+        if (loan.CompletedAt is not null)
+        {
+            return InviteResult<InviteResponse>.Refused(LoanLock.Message);
+        }
+
         if (invite.Status == CollectionStatus.Completed)
         {
             return InviteResult<InviteResponse>.Refused("A completed invite cannot be reissued.");
@@ -223,7 +239,7 @@ public sealed class InviteService(
         invite.RevokedAt = null;
         invite.SentAt = now;
         invite.LastReminderAt = null;
-        StatusRecalculator.Apply(loan, now);
+        StatusRecalculator.Apply(loan);
 
         try
         {
