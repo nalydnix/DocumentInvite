@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
-import { HomePage } from '../pages/HomePage';
+import { HomeRedirect } from './HomeRedirect';
 import { LoginPage } from '../pages/LoginPage';
 import { jsonResponse, meBody, mockApi, renderApp, resetSession, tokens } from '../test-utils';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -15,7 +15,9 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
+          <Route index element={<HomeRedirect />} />
+          <Route path="loans" element={<h1>Loans page</h1>} />
+          <Route path="audit" element={<h1>Audit page</h1>} />
           <Route element={<ProtectedRoute roles={['Admin']} />}>
             <Route path="users" element={<h1>Users admin</h1>} />
           </Route>
@@ -83,14 +85,14 @@ describe('sign-in and protected routes', () => {
 
     renderApp(<AppRoutes />, '/');
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Lee Officer' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Loans page' })).toBeInTheDocument();
   });
 
   it('signs out and returns to the sign-in page', async () => {
     mockApi(loginRoutes(['Admin']));
     renderApp(<AppRoutes />, '/');
     await signInThroughForm();
-    await screen.findByRole('heading', { name: 'Welcome, Dana Admin' });
+    await screen.findByRole('heading', { name: 'Loans page' });
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[0]);
 
@@ -117,7 +119,7 @@ describe('role-aware navigation', () => {
 
     const nav = (await screen.findAllByRole('navigation', { name: 'Main' }))[0];
 
-    expect(nav).toHaveTextContent('Home');
+    expect(nav).toHaveTextContent('Audit log');
     expect(nav).not.toHaveTextContent('Users');
   });
 
@@ -125,11 +127,29 @@ describe('role-aware navigation', () => {
     mockApi(loginRoutes(['Admin']));
     renderApp(<AppRoutes />, '/');
     await signInThroughForm();
-    await screen.findByRole('heading', { name: 'Welcome, Dana Admin' });
+    await screen.findByRole('heading', { name: 'Loans page' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
 
     expect(screen.getByRole('button', { name: 'Close' })).toHaveAttribute('aria-expanded', 'true');
     expect(document.getElementById('mobile-menu')).toHaveTextContent('Users');
+  });
+});
+
+describe('landing route', () => {
+  it('redirects / to Loans for staff', async () => {
+    mockApi(loginRoutes(['LoanOfficer']));
+    renderApp(<AppRoutes />, '/');
+    await signInThroughForm();
+
+    expect(await screen.findByRole('heading', { name: 'Loans page' })).toBeInTheDocument();
+  });
+
+  it('redirects / to the audit log for an auditor, who cannot open Loans', async () => {
+    mockApi(loginRoutes(['Auditor']));
+    renderApp(<AppRoutes />, '/');
+    await signInThroughForm();
+
+    expect(await screen.findByRole('heading', { name: 'Audit page' })).toBeInTheDocument();
   });
 });

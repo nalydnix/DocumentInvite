@@ -11,7 +11,6 @@ interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { to: '/', label: 'Home' },
   { to: '/loans', label: 'Loans', roles: ['Admin', 'LoanOfficer', 'Viewer'] },
   { to: '/templates', label: 'Templates', roles: ['Admin', 'LoanOfficer', 'Viewer'] },
   { to: '/outbox', label: 'Outbox', roles: ['Admin', 'LoanOfficer'] },
@@ -30,7 +29,6 @@ function NavLinks({ user, onNavigate }: { user: CurrentUser; onNavigate?: () => 
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
             onClick={onNavigate}
             className={({ isActive }) =>
               `rounded-lg px-3 py-2 text-sm font-medium ${
