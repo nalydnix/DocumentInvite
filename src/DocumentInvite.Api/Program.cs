@@ -17,6 +17,7 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddPlatform();
+builder.Services.AddProductionSecurity(builder.Configuration);
 builder.Services.AddStaffAuth();
 builder.Services.AddTemplates();
 builder.Services.AddLoans();
@@ -34,11 +35,12 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+app.UseProductionSecurity();
 app.UsePlatform();
 app.UseStaffAuth();
 app.UsePortal();
 
-if (app.Environment.IsDevelopment())
+if (app.ApiDocsEnabled())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();

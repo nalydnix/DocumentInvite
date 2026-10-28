@@ -1,0 +1,89 @@
+name: Deploy API
+
+# Builds and tests the API, applies EF migrations with the privileged connection string and deploys to
+# Azure App Service. Runs on pushes to main and by hand. When the deployment secrets are not
+# configured the workflow still passes: the build and tests run and the deployment steps are skipped.
+# The web app is deployed by Vercel's Git integration, not by this workflow. See docs/deployment.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+      AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      AZURE_SQL_SERVER_NAME: ${{ secrets.AZURE_SQL_SERVER_NAME }}
+      ConnectionStrings__Migrations: ${{ secrets.AZURE_SQL_MIGRATIONS_CONNECTION_STRING }}
+    steps:
+      - name: Check deployment secrets
+        id: config
+        run: |
+          missing=""
+          for name in AZURE_CREDENTIALS AZURE_WEBAPP_NAME AZURE_RESOURCE_GROUP AZURE_SQL_SERVER_NAME ConnectionStrings__Migrations; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deployment skipped; secrets not configured:$missing"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet build --configuration Release
+      - run: dotnet test --configuration Release --no-build
+
+      - name: Publish
+        if: steps.config.outputs.enabled == 'true'
+        run: dotnet publish src/DocumentInvite.Api --configuration Release --no-build --output "$RUNNER_TEMP/publish"
+
+      - name: Sign in to Azure
+        if: steps.config.outputs.enabled == 'true'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Allow this runner through the SQL firewall
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          ip=$(curl --fail --silent --show-error https://api.ipify.org)
+          echo "RUNNER_IP=$ip" >> "$GITHUB_ENV"
+          az sql server firewall-rule create \
+            --resource-group "$AZURE_RESOURCE_GROUP" --server "$AZURE_SQL_SERVER_NAME" \
+            --name "github-deploy-${GITHUB_RUN_ID}" --start-ip-address "$ip" --end-ip-address "$ip" --output none
+
+      - name: Apply EF migrations
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          dotnet tool restore
+          dotnet ef database update --project src/DocumentInvite.Api --no-build --configuration Release
+
+      - name: Deploy to App Service
+        if: steps.config.outputs.enabled == 'true'
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          package: ${{ runner.temp }}/publish
+
+      - name: Remove the SQL firewall rule
+        if: ${{ always() && steps.config.outputs.enabled == 'true' && env.RUNNER_IP != '' }}
+        run: |
+          az sql server firewall-rule delete \
+            --resource-group "$AZURE_RESOURCE_GROUP" --server "$AZURE_SQL_SERVER_NAME" \
+            --name "github-deploy-${GITHUB_RUN_ID}" --output none || true

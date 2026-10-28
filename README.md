@@ -2,6 +2,8 @@
 
 Secure document-collection platform for commercial lenders. See [docs/architecture.md](docs/architecture.md) for the design.
 
+Deployment (Azure App Service, Vercel, Bicep): see [docs/deployment.md](docs/deployment.md).
+
 ## Prerequisites
 
 - .NET SDK 10
@@ -45,7 +47,7 @@ dotnet run --project src/DocumentInvite.Api
 
 - Health check: `GET /health`
 - OpenAPI document: `/openapi/v1.json` (Development only)
-- Scalar UI: `/scalar` (Development only)
+- Scalar UI: `/scalar` (Development only, or when `Scalar__Enabled=true`)
 
 ## Web app
 

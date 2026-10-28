@@ -1,0 +1,22 @@
+name: Infra check
+
+# Validates the Bicep template whenever it changes.
+on:
+  pull_request:
+    paths: ['infra/**', '.github/workflows/infra-check.yml']
+  push:
+    branches: [main]
+    paths: ['infra/**', '.github/workflows/infra-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  bicep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Bicep template
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - name: Check the provisioning script syntax
+        run: bash -n infra/provision.sh
