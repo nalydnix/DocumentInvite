@@ -58,6 +58,20 @@ public sealed class GdprService(AppDbContext db, IBlobStore blobs, IAuditLog aud
     /// <summary>The pseudonym code for an erased contact, for example <c>7F3A</c>. Derived from the id, so it is stable.</summary>
     public static string PseudonymCode(Guid contactId) => contactId.ToString("N")[..4].ToUpperInvariant();
 
+    /// <summary>
+    /// Replaces a contact's name, email and phone with a pseudonym and stamps <c>ErasedAt</c>. Shared by
+    /// erasure and the retention purge so both leave a contact in exactly the same state.
+    /// </summary>
+    internal static void Pseudonymise(Contact contact, DateTimeOffset now)
+    {
+        contact.FirstName = "Erased";
+        contact.LastName = PseudonymCode(contact.Id);
+        contact.Email = $"erased+{contact.Id:N}@invalid";
+        contact.Phone = null;
+        contact.IsPseudonymised = true;
+        contact.ErasedAt = now;
+    }
+
     // ---- export ----
 
     public async Task<GdprResult<ContactExportPackage>> PrepareExportAsync(Guid contactId, CancellationToken ct)
@@ -193,12 +207,7 @@ public sealed class GdprService(AppDbContext db, IBlobStore blobs, IAuditLog aud
             message.Body = string.Empty;
         }
 
-        contact.FirstName = "Erased";
-        contact.LastName = PseudonymCode(contact.Id);
-        contact.Email = $"erased+{contact.Id:N}@invalid";
-        contact.Phone = null;
-        contact.IsPseudonymised = true;
-        contact.ErasedAt = now;
+        Pseudonymise(contact, now);
 
         try
         {

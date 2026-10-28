@@ -1,3 +1,4 @@
+using DocumentInvite.Api.Common.Paging;
 using DocumentInvite.Api.Features.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
@@ -35,6 +36,27 @@ public class GdprController(GdprService service) : ControllerBase
     }
 }
 
+/// <summary>The retention purge: a dry-run preview and the real run. Admin only.</summary>
+[ApiController]
+[Route("api/gdpr/retention")]
+[Authorize(Policy = AuthPolicies.RequireAdmin)]
+public class RetentionController(RetentionService service) : ControllerBase
+{
+    /// <summary>Lists the loans and file counts a run would purge. Changes nothing.</summary>
+    [HttpGet("preview")]
+    public async Task<RetentionPreviewResponse> Preview([FromQuery] PageQuery query, CancellationToken ct) =>
+        await service.PreviewAsync(query, ct);
+
+    [HttpPost("run")]
+    public async Task<IActionResult> Run(CancellationToken ct)
+    {
+        var result = await service.RunAsync(ct);
+        return result.Conflict is not null
+            ? Problem(detail: result.Conflict, statusCode: StatusCodes.Status409Conflict)
+            : Ok(result.Value);
+    }
+}
+
 /// <summary>Writes the zip straight to the response body.</summary>
 internal sealed class ExportZipResult(ContactExportPackage package) : IActionResult
 {
@@ -63,5 +85,5 @@ internal sealed class ExportZipResult(ContactExportPackage package) : IActionRes
 public static class GdprServiceCollectionExtensions
 {
     public static IServiceCollection AddGdpr(this IServiceCollection services) =>
-        services.AddScoped<GdprService>();
+        services.AddScoped<GdprService>().AddScoped<RetentionService>();
 }
