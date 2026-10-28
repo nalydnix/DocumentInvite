@@ -72,7 +72,7 @@ Ports are never hard-coded, so multiple instances can run at once.
 - Web port: `npm run dev -- --port 5174`, or set `VITE_PORT=5174`.
 - Point the dev proxy at the matching API with `VITE_API_PROXY_TARGET=http://localhost:5301` (`VITE_API_BASE_URL` is also accepted as the proxy target). In development the browser always calls relative `/api` URLs and the dev server proxies them to the API, so no CORS configuration is needed. `VITE_API_BASE_URL` only takes effect in production builds. Put these in an untracked `src/DocumentInvite.Web/.env.local`.
 
-- E-mail link origin: links in e-mails (portal and loan links) are built from `Portal__BaseUrl`. It has no default and must be the origin the web app is served from, for example `Portal__BaseUrl=http://localhost:5174` for the second instance below. Sending an e-mail fails with a clear error while it is unset. Set it per instance as an environment variable (or with `dotnet user-secrets`).
+- E-mail link origin: links in e-mails (portal and loan links) are built from `Portal__BaseUrl`. In Development it defaults to `http://localhost:5173` (the Vite dev port, from `appsettings.Development.json`), so a plain local run seeds the demo data. Elsewhere it has no default and must be the origin the web app is served from; override it per instance, for example `Portal__BaseUrl=http://localhost:5174` for the second instance below. Sending an e-mail fails with a clear error while it is unset (outside Development). Set it per instance as an environment variable (or with `dotnet user-secrets`).
 
 Example for a second instance:
 

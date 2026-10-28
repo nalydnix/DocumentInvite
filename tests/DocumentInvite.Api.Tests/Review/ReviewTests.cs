@@ -100,7 +100,7 @@ public class ReviewTests : StaffTestBase
         db.Contacts.Add(contact);
         db.Loans.Add(loan);
         db.StoredFiles.Add(file);
-        StatusRecalculator.Apply(loan, DateTimeOffset.UtcNow);
+        StatusRecalculator.Apply(loan);
         await db.SaveChangesAsync();
         return new Seeded(loan.Id, invite.Id, fileItem.Id, fieldItem.Id, file.Id, hash);
     }
@@ -131,8 +131,8 @@ public class ReviewTests : StaffTestBase
         var approveField = await officer.PostAsync($"/api/items/{seed.FieldItemId}/approve", null);
         var last = (await approveField.Content.ReadFromJsonAsync<ReviewResponse>())!;
         last.InviteStatus.Should().Be(CollectionStatus.Completed);
-        last.LoanStatus.Should().Be(CollectionStatus.Completed);
-        (await DbAsync(db => db.Loans.AsNoTracking().SingleAsync(l => l.Id == seed.LoanId))).CompletedAt.Should().NotBeNull();
+        last.LoanStatus.Should().Be(CollectionStatus.ReadyToComplete);
+        (await DbAsync(db => db.Loans.AsNoTracking().SingleAsync(l => l.Id == seed.LoanId))).CompletedAt.Should().BeNull();
 
         var events = (await AuditEventsAsync()).Where(e => e.Action == "item.approved").ToList();
         events.Should().HaveCount(2);

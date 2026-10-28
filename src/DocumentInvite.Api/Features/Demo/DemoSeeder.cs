@@ -286,7 +286,14 @@ public sealed class DemoSeeder(
         }
 
         loan.Invites.Add(invite);
-        StatusRecalculator.Apply(loan, now);
+        StatusRecalculator.Apply(loan);
+
+        if (loan.Status == CollectionStatus.ReadyToComplete)
+        {
+            // Completion is explicit, so the demo loan that is fully approved is completed here.
+            loan.CompletedAt = now;
+            StatusRecalculator.Apply(loan);
+        }
 
         db.Contacts.Add(contact);
         db.Loans.Add(loan);

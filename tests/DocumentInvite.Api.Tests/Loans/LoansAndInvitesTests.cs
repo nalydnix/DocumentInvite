@@ -494,7 +494,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
     // ---- status ----
 
     [Fact]
-    public async Task The_loan_status_follows_its_active_invites_and_stamps_CompletedAt()
+    public async Task The_loan_status_follows_its_active_invites_and_is_ReadyToComplete_without_CompletedAt()
     {
         var client = await OfficerAsync();
         var ann = await CreateContactAsync(client);
@@ -507,13 +507,13 @@ public partial class LoansAndInvitesTests : StaffTestBase
             await db.RequestItems.ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, RequestItemStatus.Approved));
         }
 
-        // Revoking triggers a recalculation: Bob's invite is excluded, Ann's is approved, so the loan completes.
+        // Revoking triggers a recalculation: Bob's invite is excluded, Ann's is approved, so the loan is ready to complete.
         var bobInvite = invites.Single(i => i.ContactId == bob.Id);
         await client.PostAsync($"/api/invites/{bobInvite.Id}/revoke", null);
 
         var detail = await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{loan.Id}");
-        detail!.Status.Should().Be(CollectionStatus.Completed);
-        detail.CompletedAt.Should().NotBeNull();
+        detail!.Status.Should().Be(CollectionStatus.ReadyToComplete);
+        detail.CompletedAt.Should().BeNull();
         detail.Invites.Single(i => i.ContactId == ann.Id).Status.Should().Be(CollectionStatus.Completed);
     }
 }

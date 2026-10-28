@@ -10,6 +10,9 @@ public enum CollectionStatus
     InProgress,
     Submitted,
     Completed,
+
+    /// <summary>Loan only: every item on every active invite is Approved, awaiting the explicit complete action.</summary>
+    ReadyToComplete,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -35,7 +38,7 @@ public class Loan
     public Guid? CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>Stamped when the loan becomes Completed. Starts the retention period.</summary>
+    /// <summary>Stamped by the explicit complete action, cleared on reopen. Starts the retention period and locks the loan.</summary>
     public DateTimeOffset? CompletedAt { get; set; }
 
     /// <summary>Derived from the loan's invites by <c>StatusCalculator</c> and stored for filtering.</summary>

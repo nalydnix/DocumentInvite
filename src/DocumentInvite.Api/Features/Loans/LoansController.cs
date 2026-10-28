@@ -26,6 +26,15 @@ public class LoansController(LoanService service) : ControllerBase
         return result.Loan is { } loan ? CreatedAtAction(nameof(Get), new { id = loan.Id }, loan) : ToActionResult(result);
     }
 
+    [HttpPost("{id:guid}/complete")]
+    [Authorize(Policy = AuthPolicies.RequireStaff)]
+    public async Task<IActionResult> Complete(Guid id, CancellationToken ct) => ToActionResult(await service.CompleteAsync(id, ct));
+
+    [HttpPost("{id:guid}/reopen")]
+    [Authorize(Policy = AuthPolicies.RequireStaff)]
+    public async Task<IActionResult> Reopen(Guid id, ReopenLoanRequest request, CancellationToken ct) =>
+        ToActionResult(await service.ReopenAsync(id, request.Reason!, ct));
+
     private IActionResult ToActionResult(LoanResult result)
     {
         if (result.NotFound)

@@ -134,7 +134,7 @@ public class StatusCalculatorTests
     [InlineData(InProgress, Completed, InProgress)]
     [InlineData(CollectionStatus.Submitted, CollectionStatus.Submitted, CollectionStatus.Submitted)]
     [InlineData(CollectionStatus.Submitted, Completed, CollectionStatus.Submitted)]
-    [InlineData(Completed, Completed, Completed)]
+    [InlineData(Completed, Completed, ReadyToComplete)]
     public void A_loan_is_derived_from_its_invites(
         CollectionStatus first, CollectionStatus second, CollectionStatus expected)
     {
@@ -151,31 +151,41 @@ public class StatusCalculatorTests
     };
 
     [Fact]
-    public void Completing_every_invite_stamps_CompletedAt_once()
+    public void Approving_every_invite_makes_the_loan_ReadyToComplete_without_stamping_CompletedAt()
     {
-        var first = new DateTimeOffset(2027, 1, 5, 10, 0, 0, TimeSpan.Zero);
         var loan = new Loan { Invites = [InviteWith(true, Approved), InviteWith(true, Approved)] };
 
-        StatusRecalculator.Apply(loan, first);
-        StatusRecalculator.Apply(loan, first.AddDays(3));
+        StatusRecalculator.Apply(loan);
 
-        loan.Status.Should().Be(Completed);
-        loan.CompletedAt.Should().Be(first);
+        loan.Status.Should().Be(ReadyToComplete);
+        loan.CompletedAt.Should().BeNull();
     }
 
     [Fact]
-    public void A_loan_that_stops_being_completed_loses_CompletedAt()
+    public void A_completed_loan_stays_Completed_and_keeps_CompletedAt()
+    {
+        var stamped = DateTimeOffset.UnixEpoch;
+        var loan = new Loan { CompletedAt = stamped, Invites = [InviteWith(true, Approved)] };
+        loan.Invites[0].Items[0].Status = Rejected;
+
+        StatusRecalculator.Apply(loan);
+
+        loan.Status.Should().Be(Completed);
+        loan.CompletedAt.Should().Be(stamped);
+    }
+
+    [Fact]
+    public void A_ReadyToComplete_loan_returns_to_InProgress_when_an_item_is_rejected()
     {
         var loan = new Loan { Invites = [InviteWith(true, Approved)] };
-        StatusRecalculator.Apply(loan, DateTimeOffset.UnixEpoch);
-        loan.CompletedAt.Should().NotBeNull();
+        StatusRecalculator.Apply(loan);
+        loan.Status.Should().Be(ReadyToComplete);
 
         loan.Invites[0].Items[0].Status = Rejected;
-        StatusRecalculator.Apply(loan, DateTimeOffset.UnixEpoch.AddDays(1));
+        StatusRecalculator.Apply(loan);
 
         loan.Invites[0].Status.Should().Be(InProgress);
         loan.Status.Should().Be(InProgress);
-        loan.CompletedAt.Should().BeNull();
     }
 
     [Fact]
@@ -185,9 +195,9 @@ public class StatusCalculatorTests
         revoked.RevokedAt = DateTimeOffset.UnixEpoch;
         var loan = new Loan { Invites = [revoked, InviteWith(true, Approved)] };
 
-        StatusRecalculator.Apply(loan, DateTimeOffset.UnixEpoch);
+        StatusRecalculator.Apply(loan);
 
-        loan.Status.Should().Be(Completed);
+        loan.Status.Should().Be(ReadyToComplete);
     }
 
     // ---- portal tokens ----
