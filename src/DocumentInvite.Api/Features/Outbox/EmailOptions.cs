@@ -28,8 +28,8 @@ public sealed class PortalOptions
     public const string Section = "Portal";
 
     /// <summary>
-    /// The web app origin that portal links point at (<c>Portal__BaseUrl</c>). Set per instance; there is no default
-    /// because the web port varies (see the README's side-by-side section).
+    /// The web app origin that portal links point at (<c>Portal__BaseUrl</c>). Set per instance because the web port varies; only
+    /// <c>appsettings.Development.json</c> defaults it (to the Vite dev port). Other environments must set it. See the README side-by-side section.
     /// </summary>
     public string BaseUrl { get; set; } = string.Empty;
 }
