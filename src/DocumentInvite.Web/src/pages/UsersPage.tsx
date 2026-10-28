@@ -11,7 +11,7 @@ export interface UserSummary {
   id: string;
   email: string;
   displayName: string;
-  roles: Role[];
+  role: Role;
   accessExpiresAt: string | null;
   isLockedOut: boolean;
 }
@@ -36,26 +36,33 @@ function RolePicker({
   value,
   onChange,
   idPrefix,
+  label,
 }: {
-  value: Role[];
-  onChange: (roles: Role[]) => void;
+  value: Role | '';
+  onChange: (role: Role | '') => void;
   idPrefix: string;
+  label: string;
 }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-4 gap-y-1">
-      <legend className="sr-only">Roles</legend>
-      {ROLES.map((role) => (
-        <label key={role} htmlFor={`${idPrefix}-${role}`} className="flex items-center gap-2 text-sm">
-          <input
-            id={`${idPrefix}-${role}`}
-            type="checkbox"
-            checked={value.includes(role)}
-            onChange={(e) => onChange(e.target.checked ? [...value, role] : value.filter((r) => r !== role))}
-          />
-          {role}
-        </label>
-      ))}
-    </fieldset>
+    <label htmlFor={`${idPrefix}-role`} className="block text-sm font-medium text-ink">
+      {label}
+      <select
+        id={`${idPrefix}-role`}
+        className={inputClass}
+        value={value}
+        required
+        onChange={(e) => onChange(e.target.value as Role | '')}
+      >
+        <option value="" disabled>
+          Choose a role
+        </option>
+        {ROLES.map((role) => (
+          <option key={role} value={role}>
+            {role}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -64,7 +71,7 @@ function CreateUserForm() {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [role, setRole] = useState<Role | ''>('');
   const [expiry, setExpiry] = useState('');
 
   const create = useMutation({
@@ -75,15 +82,15 @@ function CreateUserForm() {
           email,
           displayName,
           password,
-          roles,
-          accessExpiresAt: roles.includes('Auditor') ? toExpiry(expiry) : null,
+          role,
+          accessExpiresAt: role === 'Auditor' ? toExpiry(expiry) : null,
         },
       }),
     onSuccess: async () => {
       setEmail('');
       setDisplayName('');
       setPassword('');
-      setRoles([]);
+      setRole('');
       setExpiry('');
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     },
@@ -112,7 +119,7 @@ function CreateUserForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {roles.includes('Auditor') && (
+        {role === 'Auditor' && (
           <Field
             label="Access expires on"
             type="date"
@@ -121,7 +128,7 @@ function CreateUserForm() {
           />
         )}
         <div className="sm:col-span-2">
-          <RolePicker value={roles} onChange={setRoles} idPrefix="new" />
+          <RolePicker value={role} onChange={setRole} idPrefix="new" label="Role" />
         </div>
         <div className="space-y-3 sm:col-span-2">
           <ErrorList messages={messagesOf(create.error)} />
@@ -136,12 +143,12 @@ function CreateUserForm() {
 
 function UserRow({ user }: { user: UserSummary }) {
   const queryClient = useQueryClient();
-  const [roles, setRoles] = useState<Role[]>(user.roles);
+  const [role, setRole] = useState<Role | ''>(user.role);
   const [expiry, setExpiry] = useState(toDateInput(user.accessExpiresAt));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['users'] });
 
-  const saveRoles = useMutation({
-    mutationFn: () => apiFetch<UserSummary>(`/api/users/${user.id}/roles`, { method: 'PUT', body: { roles } }),
+  const saveRole = useMutation({
+    mutationFn: () => apiFetch<UserSummary>(`/api/users/${user.id}/role`, { method: 'PUT', body: { role } }),
     onSuccess: refresh,
   });
   const saveExpiry = useMutation({
@@ -153,8 +160,8 @@ function UserRow({ user }: { user: UserSummary }) {
     onSuccess: refresh,
   });
 
-  const rolesChanged = roles.length !== user.roles.length || roles.some((r) => !user.roles.includes(r));
-  const isAuditor = user.roles.includes('Auditor');
+  const roleChanged = role !== user.role;
+  const isAuditor = user.role === 'Auditor';
 
   return (
     <li className="space-y-3 rounded-card border border-surface-border bg-surface p-4 shadow-card">
@@ -168,16 +175,16 @@ function UserRow({ user }: { user: UserSummary }) {
         )}
       </div>
 
-      <RolePicker value={roles} onChange={setRoles} idPrefix={user.id} />
+      <RolePicker value={role} onChange={setRole} idPrefix={user.id} label={`Role for ${user.displayName}`} />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          disabled={!rolesChanged || roles.length === 0 || saveRoles.isPending}
-          onClick={() => saveRoles.mutate()}
+          disabled={!roleChanged || role === '' || saveRole.isPending}
+          onClick={() => saveRole.mutate()}
           className={secondaryButtonClass}
-          aria-label={`Save roles for ${user.displayName}`}
+          aria-label={`Save role for ${user.displayName}`}
         >
-          Save roles
+          Save role
         </button>
       </div>
 
@@ -218,7 +225,7 @@ function UserRow({ user }: { user: UserSummary }) {
           )}
         </div>
       )}
-      <ErrorList messages={[...messagesOf(saveRoles.error), ...messagesOf(saveExpiry.error)]} />
+      <ErrorList messages={[...messagesOf(saveRole.error), ...messagesOf(saveExpiry.error)]} />
     </li>
   );
 }
@@ -245,7 +252,7 @@ export function UsersPage() {
           {data.items.map((user) => (
             // Keyed on the saved state so the row's editors reset when the server data changes.
             <UserRow
-              key={`${user.id}:${user.roles.join(',')}:${user.accessExpiresAt ?? ''}`}
+              key={`${user.id}:${user.role}:${user.accessExpiresAt ?? ''}`}
               user={user}
             />
           ))}

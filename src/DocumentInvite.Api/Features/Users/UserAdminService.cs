@@ -37,7 +37,7 @@ public sealed class UserAdminService(
             .ToListAsync(ct);
 
         var items = page.Items
-            .Select(u => ToResponse(u, rolesByUser.Where(r => r.UserId == u.Id).Select(r => r.Name!).Order().ToList()))
+            .Select(u => ToResponse(u, HighestRole(rolesByUser.Where(r => r.UserId == u.Id).Select(r => r.Name!))))
             .ToList();
         return new PagedResponse<UserResponse>(items, page.Total, page.Page, page.PageSize);
     }
@@ -50,7 +50,7 @@ public sealed class UserAdminService(
 
     public async Task<UserResult> CreateAsync(CreateUserRequest request, CancellationToken ct)
     {
-        var roles = request.Roles!.Distinct().ToList();
+        var role = request.Role!;
         var user = new AppUser
         {
             UserName = request.Email,
@@ -68,9 +68,9 @@ public sealed class UserAdminService(
             return FromIdentityErrors(created);
         }
 
-        await users.AddToRolesAsync(user, roles);
+        await users.AddToRoleAsync(user, role);
 
-        var details = RoleDetails(AuditDetails.Empty.WithCount("roleCount", roles.Count), roles, RoleChange.Added);
+        var details = AuditDetails.Empty.WithCount("roleCount", 1).WithEnum("role" + role, RoleChange.Added);
         if (user.AccessExpiresAt is not null)
         {
             details.WithEnum("expiry", ExpiryChange.Set);
@@ -79,10 +79,10 @@ public sealed class UserAdminService(
         await audit.RecordAsync("user.created", new AuditTarget("user", user.Id), details, ct);
         await transaction.CommitAsync(ct);
 
-        return UserResult.Ok(ToResponse(user, roles.Order().ToList()));
+        return UserResult.Ok(ToResponse(user, role));
     }
 
-    public async Task<UserResult> SetRolesAsync(Guid id, SetRolesRequest request, CancellationToken ct)
+    public async Task<UserResult> SetRoleAsync(Guid id, SetRoleRequest request, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(id.ToString());
         if (user is null)
@@ -90,19 +90,19 @@ public sealed class UserAdminService(
             return UserResult.Missing();
         }
 
-        var wanted = request.Roles!.Distinct().ToList();
+        var wanted = request.Role!;
         var current = (await users.GetRolesAsync(user)).ToList();
-        var added = wanted.Except(current).ToList();
-        var removed = current.Except(wanted).ToList();
+        var added = current.Contains(wanted) ? new List<string>() : [wanted];
+        var removed = current.Where(r => r != wanted).ToList();
 
         if (removed.Contains(StaffRoles.Admin) && context.ActorId == user.Id)
         {
-            return UserResult.Invalid("roles", "You cannot remove the Admin role from your own account.");
+            return UserResult.Invalid("role", "You cannot remove the Admin role from your own account.");
         }
 
         if (added.Count == 0 && removed.Count == 0)
         {
-            return UserResult.Ok(ToResponse(user, current.Order().ToList()));
+            return UserResult.Ok(ToResponse(user, wanted));
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -112,12 +112,12 @@ public sealed class UserAdminService(
         // Invalidates refresh tokens, so the new roles apply at the next sign-in.
         await users.UpdateSecurityStampAsync(user);
 
-        var details = RoleDetails(AuditDetails.Empty.WithCount("roleCount", wanted.Count), added, RoleChange.Added);
+        var details = RoleDetails(AuditDetails.Empty.WithCount("roleCount", 1), added, RoleChange.Added);
         RoleDetails(details, removed, RoleChange.Removed);
         await audit.RecordAsync("user.roles_changed", new AuditTarget("user", user.Id), details, ct);
 
         // An access expiry only makes sense for an Auditor.
-        if (removed.Contains(StaffRoles.Auditor) && user.AccessExpiresAt is not null)
+        if (wanted != StaffRoles.Auditor && user.AccessExpiresAt is not null)
         {
             user.AccessExpiresAt = null;
             await users.UpdateAsync(user);
@@ -127,7 +127,7 @@ public sealed class UserAdminService(
         }
 
         await transaction.CommitAsync(ct);
-        return UserResult.Ok(ToResponse(user, wanted.Order().ToList()));
+        return UserResult.Ok(ToResponse(user, wanted));
     }
 
     public async Task<UserResult> SetAccessExpiryAsync(Guid id, SetAccessExpiryRequest request, CancellationToken ct)
@@ -175,9 +175,13 @@ public sealed class UserAdminService(
     }
 
     private async Task<UserResponse> ToResponseAsync(AppUser user) =>
-        ToResponse(user, (await users.GetRolesAsync(user)).Order().ToList());
+        ToResponse(user, HighestRole(await users.GetRolesAsync(user)));
 
-    private UserResponse ToResponse(AppUser user, IReadOnlyList<string> roles) =>
-        new(user.Id, user.Email ?? string.Empty, user.DisplayName, roles, user.AccessExpiresAt,
+    /// <summary>The most privileged of the given roles (Admin, LoanOfficer, Viewer, Auditor), if any.</summary>
+    private static string HighestRole(IEnumerable<string> roles) =>
+        StaffRoles.All.FirstOrDefault(roles.Contains) ?? string.Empty;
+
+    private UserResponse ToResponse(AppUser user, string role) =>
+        new(user.Id, user.Email ?? string.Empty, user.DisplayName, role, user.AccessExpiresAt,
             user.LockoutEnd is { } end && end > clock.GetUtcNow());
 }

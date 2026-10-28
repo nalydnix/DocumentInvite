@@ -141,7 +141,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 All routes are under `/api` unless noted. Staff routes need a bearer token, and portal routes need a portal session.
 
 - `/api/auth/*` (MapIdentityApi, with registration disabled), `/api/me`
-- `/api/users` (Admin: create, list, set roles, set access expiry)
+- `/api/users` (Admin: create, list, set role (exactly one per user), set access expiry)
 - `/api/contacts`, `/api/templates` (list, get, create, edit with item reorder, `archive`, `restore`), `/api/loans`, `/api/loans/{id}/invites`, `/api/invites/{id}` (revoke, reissue, items)
 - `/api/items/{id}/approve|reject`, `/api/files/{id}/preview-url|download-url`
 - `/api/loans/{id}/export` (zip)
