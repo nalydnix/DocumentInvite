@@ -39,7 +39,6 @@ public abstract class DemoTestBase : StaffTestBase
             o.Enabled = DemoEnabled;
             o.Accounts["Admin"] = new DemoAccountOptions { Email = AdminEmail, Password = AdminPassword };
             o.Accounts["LoanOfficer"] = new DemoAccountOptions { Email = OfficerEmail, Password = OfficerPassword };
-            o.Accounts["Viewer"] = new DemoAccountOptions { Email = "viewer@demo.test", Password = "Demo-Viewer-Passw0rd!" };
             o.Accounts["Auditor"] = new DemoAccountOptions { Email = AuditorEmail, Password = AuditorPassword };
         });
     }
@@ -64,13 +63,12 @@ public class DemoSeedingTests : DemoTestBase
     protected override bool DemoEnabled => true;
 
     [Fact]
-    public async Task Seeding_creates_the_four_accounts_and_the_sign_in_page_shows_admin_and_auditor_only()
+    public async Task Seeding_creates_the_three_accounts_and_the_sign_in_page_shows_admin_and_auditor_only()
     {
         _ = Factory.Services; // starts the host, which seeds
         await SignInAsync(AdminEmail, AdminPassword);
         await SignInAsync(AuditorEmail, AuditorPassword);
         await SignInAsync(OfficerEmail, OfficerPassword);
-        await SignInAsync("viewer@demo.test", "Demo-Viewer-Passw0rd!");
 
         var config = await NewClient().GetFromJsonAsync<DemoConfigResponse>("/api/demo/config");
         config!.Enabled.Should().BeTrue();

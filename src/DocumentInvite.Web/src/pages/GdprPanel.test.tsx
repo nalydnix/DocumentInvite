@@ -89,19 +89,6 @@ describe("GdprPanel", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("is not shown to a viewer", async () => {
-    mockApi({
-      ...signedIn(["Viewer"]),
-      "GET /api/contacts/c1": () => jsonResponse(200, ann),
-    });
-    renderContact();
-
-    expect(await screen.findByText("Contact details")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Export data" }),
-    ).not.toBeInTheDocument();
-  });
-
   it("erases only after an explicit confirmation", async () => {
     let erased = false;
     const { calls } = mockApi({

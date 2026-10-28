@@ -222,22 +222,6 @@ public class MessagingTests : PortalTestBase
     // ---- roles ----
 
     [Fact]
-    public async Task A_viewer_can_read_the_thread_but_not_post_or_see_notes()
-    {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
-        (await officer.PostAsJsonAsync($"/api/invites/{party.Invite.Id}/messages", Body("Shared"))).EnsureSuccessStatusCode();
-        (await officer.PostAsJsonAsync($"/api/invites/{party.Invite.Id}/notes", Body(NoteText))).EnsureSuccessStatusCode();
-        var viewer = await ClientForAsync("viewer@example.com", [StaffRoles.Viewer]);
-
-        var thread = await PageOf<StaffMessageResponse>(await viewer.GetAsync($"/api/invites/{party.Invite.Id}/messages"));
-        thread.Items.Should().ContainSingle().Which.Body.Should().Be("Shared");
-
-        (await viewer.PostAsJsonAsync($"/api/invites/{party.Invite.Id}/messages", Body("Hi"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await viewer.PostAsJsonAsync($"/api/invites/{party.Invite.Id}/notes", Body("Hi"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
     public async Task An_auditor_and_an_anonymous_caller_cannot_use_the_thread()
     {
         var officer = await OfficerAsync();

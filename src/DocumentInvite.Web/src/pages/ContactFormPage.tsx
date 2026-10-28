@@ -159,7 +159,7 @@ function ContactForm({
   );
 }
 
-/** Create (no id in the route) or edit a contact. Viewers see the details read-only. */
+/** Create (no id in the route) or edit a contact. */
 export function ContactFormPage() {
   const { id } = useParams();
   const { state } = useAuth();
