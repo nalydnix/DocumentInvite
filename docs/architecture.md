@@ -122,6 +122,7 @@ All primary keys are `Guid`. Mutable aggregates have a rowversion concurrency to
 - **Export** (for each contact): a zip with `contact.json` (the contact, their invites, items, field values and messages) plus their files. The export is audited.
 - **Erasure** (Admin only, with a confirmation step): deletes the contact's blobs, clears field values, notes and message bodies written by the party, and replaces the name, email and phone with a pseudonym (for example `Erased-7F3A`, `erased+{id}@invalid`). It revokes the contact's invites, sets `ErasedAt` and audits `gdpr.erased` with ids only. Audit rows are unchanged, so the chain still verifies.
 - **Retention purge**: `AppSettings.RetentionDaysAfterCompletion` sets the period. A dry-run endpoint lists the loans and file counts that would be purged. The real run deletes the blobs and loan data of loans completed before the cut-off and pseudonymises contacts that no longer have active loans. It is audited, idempotent, and triggered by an Admin (and can optionally share the job endpoint pattern).
+  - `GET /api/gdpr/retention/preview` (paginated, audited as `retention.previewed`) and `POST /api/gdpr/retention/run` are Admin only. A run audits `loan.purged` per loan, `contact.pseudonymised` per contact and one `retention.run` with counts. Only contacts that were on a purged loan and have no loan left are pseudonymised, using the same routine as erasure. Blobs are deleted before the transaction commits, so a failure leaves everything in place and the run can be repeated.
 
 ## 10. Email
 

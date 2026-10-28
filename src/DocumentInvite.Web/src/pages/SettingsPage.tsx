@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { ErrorList, Field, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
+import { Pagination } from '../components/Pagination';
+import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 import { useDemoConfig } from './demo';
 
 interface Settings {
@@ -166,6 +168,127 @@ function ResetDemoPanel() {
   );
 }
 
+interface RetentionPreview {
+  retentionDays: number;
+  cutoff: string;
+  loanCount: number;
+  fileCount: number;
+  contactCount: number;
+  loans: PagedResponse<{ id: string; reference: string; name: string; completedAt: string; fileCount: number }>;
+}
+
+interface RetentionRun {
+  loansDeleted: number;
+  filesDeleted: number;
+  contactsPseudonymised: number;
+}
+
+function RetentionPanel() {
+  const queryClient = useQueryClient();
+  const paging = usePaging();
+  const [previewing, setPreviewing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  // Each preview is recorded in the audit log, so it is only fetched on request and never refetched in the background.
+  const preview = useQuery({
+    queryKey: ['retention-preview', paging.page, paging.pageSize],
+    queryFn: () => apiFetch<RetentionPreview>(`/api/gdpr/retention/preview?${paging.params()}`),
+    enabled: previewing,
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+  useClampPage(paging, preview.data?.loans.total);
+
+  const run = useMutation({
+    mutationFn: () => apiFetch<RetentionRun>('/api/gdpr/retention/run', { method: 'POST' }),
+    onSuccess: () => {
+      setConfirming(false);
+      setPreviewing(false);
+      queryClient.removeQueries({ queryKey: ['retention-preview'] });
+      void queryClient.invalidateQueries({ queryKey: ['loans'] });
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+  });
+
+  const data = preview.data;
+
+  return (
+    <div className="space-y-3">
+      <p>
+        Loans completed more than the retention period ago can be purged: their files and data are deleted and contacts
+        left without a loan are pseudonymised. Preview first; the preview changes nothing. Both are recorded in the
+        audit log.
+      </p>
+      <ErrorList messages={[...messagesOf(preview.error), ...messagesOf(run.error)]} />
+      {run.isSuccess && (
+        <p role="status" className="text-sm text-green-700">
+          Purge finished. {plural(run.data.loansDeleted, 'loan')} and {plural(run.data.filesDeleted, 'file')} deleted,{' '}
+          {plural(run.data.contactsPseudonymised, 'contact')} pseudonymised.
+        </p>
+      )}
+      {data && (
+        <div className="space-y-3 text-sm text-ink">
+          <p>
+            Cut-off {new Date(data.cutoff).toLocaleDateString()} ({data.retentionDays} days): {plural(data.loanCount, 'loan')},{' '}
+            {plural(data.fileCount, 'file')} and {plural(data.contactCount, 'contact')} would be purged.
+          </p>
+          {data.loans.items.length > 0 && (
+            <ul className="divide-y divide-surface-border rounded-md border border-surface-border">
+              {data.loans.items.map((loan) => (
+                <li key={loan.id} className="flex flex-wrap justify-between gap-2 p-2">
+                  <span>
+                    {loan.reference} - {loan.name}
+                  </span>
+                  <span className="text-ink-muted">
+                    completed {new Date(loan.completedAt).toLocaleDateString()}, {plural(loan.fileCount, 'file')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Pagination
+            page={paging.page}
+            pageSize={paging.pageSize}
+            total={data.loans.total}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={preview.isFetching}
+          onClick={() => {
+            setConfirming(false);
+            if (previewing) void preview.refetch();
+            else setPreviewing(true);
+          }}
+          className={secondaryButtonClass}
+        >
+          {preview.isFetching ? 'Loading preview...' : 'Preview purge'}
+        </button>
+        {data && data.loanCount > 0 && !confirming && (
+          <button type="button" onClick={() => setConfirming(true)} className={secondaryButtonClass}>
+            Run purge...
+          </button>
+        )}
+        {confirming && (
+          <>
+            <span className="text-sm text-ink">Permanently delete these loans and their files?</span>
+            <button type="button" disabled={run.isPending} onClick={() => run.mutate()} className={primaryButtonClass}>
+              {run.isPending ? 'Purging...' : 'Yes, purge'}
+            </button>
+            <button type="button" disabled={run.isPending} onClick={() => setConfirming(false)} className={secondaryButtonClass}>
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => apiFetch<Settings>('/api/settings') });
   const demo = useDemoConfig();
@@ -182,6 +305,9 @@ export function SettingsPage() {
       )}
       <Card title="Reminder job">
         <RunRemindersPanel />
+      </Card>
+      <Card title="Retention purge">
+        <RetentionPanel />
       </Card>
       {demo.enabled && (
         <Card title="Demo data">

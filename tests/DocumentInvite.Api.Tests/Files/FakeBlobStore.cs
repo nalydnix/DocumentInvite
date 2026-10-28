@@ -11,6 +11,9 @@ public sealed class FakeBlobStore : IBlobStore
 
     public FakeBlobStore(TimeProvider? clock = null) => _clock = clock ?? TimeProvider.System;
 
+    /// <summary>When true, <see cref="DeleteAsync"/> throws, to test failures part-way through a purge.</summary>
+    public bool FailDeletes { get; set; }
+
     public List<(string BlobName, TimeSpan Lifetime)> UploadUrls { get; } = [];
     public List<(string BlobName, TimeSpan Lifetime, string? DownloadName)> ReadUrls { get; } = [];
 
@@ -50,6 +53,11 @@ public sealed class FakeBlobStore : IBlobStore
 
     public Task DeleteAsync(string blobName, CancellationToken ct = default)
     {
+        if (FailDeletes)
+        {
+            throw new IOException("Blob delete failed.");
+        }
+
         _blobs.TryRemove(blobName, out _);
         return Task.CompletedTask;
     }

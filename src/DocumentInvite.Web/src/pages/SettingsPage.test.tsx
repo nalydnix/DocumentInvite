@@ -88,4 +88,39 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
+
+  it('previews the retention purge without deleting, then runs it after confirmation', async () => {
+    const preview = {
+      retentionDays: 365,
+      cutoff: '2025-01-01T00:00:00Z',
+      loanCount: 1,
+      fileCount: 2,
+      contactCount: 1,
+      loans: {
+        items: [{ id: 'l1', reference: 'LN-9', name: 'Old loan', completedAt: '2024-06-01T00:00:00Z', fileCount: 2 }],
+        total: 1,
+        page: 1,
+        pageSize: 25,
+      },
+    };
+    const { calls } = mockApi({
+      ...signedIn(),
+      'GET /api/settings': () => jsonResponse(200, { defaultReminderIntervalDays: 7, retentionDaysAfterCompletion: 365 }),
+      'GET /api/gdpr/retention/preview?page=1&pageSize=25': () => jsonResponse(200, preview),
+      'POST /api/gdpr/retention/run': () =>
+        jsonResponse(200, { loansDeleted: 1, filesDeleted: 2, contactsPseudonymised: 1 }),
+    });
+    renderApp(<SettingsPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Preview purge' }));
+    expect(await screen.findByText(/LN-9 - Old loan/)).toBeInTheDocument();
+    expect(screen.getByText(/1 loan, 2 files and 1 contact would be purged/)).toBeInTheDocument();
+    expect(calls.some((c) => c.key === 'POST /api/gdpr/retention/run')).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Run purge...' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, purge' }));
+
+    expect(await screen.findByText(/Purge finished/)).toHaveTextContent('1 loan and 2 files deleted, 1 contact pseudonymised');
+  });
 });

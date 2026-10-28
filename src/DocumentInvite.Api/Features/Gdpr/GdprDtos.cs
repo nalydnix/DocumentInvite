@@ -43,3 +43,21 @@ public sealed record ExportedFile(
     DateTimeOffset? UploadedAt, string ArchivePath);
 
 public sealed record ExportedMessage(Guid Id, string AuthorType, string Body, DateTimeOffset CreatedAt);
+
+/// <summary>One loan the retention purge would remove.</summary>
+public sealed record RetentionLoan(Guid Id, string Reference, string Name, DateTimeOffset CompletedAt, int FileCount);
+
+/// <summary>
+/// What a retention purge would remove right now. The totals cover every eligible loan; <c>Loans</c> is one page of them.
+/// </summary>
+public sealed record RetentionPreviewResponse(
+    int RetentionDays,
+    DateTimeOffset Cutoff,
+    int LoanCount,
+    int FileCount,
+    int ContactCount,
+    Common.Paging.PagedResponse<RetentionLoan> Loans);
+
+/// <summary>What a retention purge removed, as counts only.</summary>
+public sealed record RetentionRunResponse(
+    int RetentionDays, DateTimeOffset Cutoff, int LoansDeleted, int FilesDeleted, int ContactsPseudonymised);
