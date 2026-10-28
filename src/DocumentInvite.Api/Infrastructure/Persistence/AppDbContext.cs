@@ -28,6 +28,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<RequestItem> RequestItems => Set<RequestItem>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -157,6 +158,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             // Two files of one item can never share a sequence number, even under concurrent completion.
             e.HasIndex(x => new { x.RequestItemId, x.Sequence }).IsUnique().HasFilter("[Sequence] IS NOT NULL");
             e.HasOne<RequestItem>().WithMany().HasForeignKey(x => x.RequestItemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Message>(e =>
+        {
+            e.ToTable("Messages");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.AuthorType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            e.HasIndex(x => new { x.InviteId, x.CreatedAt });
+            e.HasOne<Invite>().WithMany().HasForeignKey(x => x.InviteId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditEvent>(e =>

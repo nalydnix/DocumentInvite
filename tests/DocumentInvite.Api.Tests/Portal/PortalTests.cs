@@ -428,13 +428,13 @@ public class PortalTests : PortalTestBase
         var bobSession = await SessionAsync(bob.Token);
 
         (await UploadAsync(bobSession, bob.FileItemId, "bob-secret.pdf")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await bobSession.PutAsJsonAsync($"/api/portal/items/{bob.NumberItemId}/field", new { value = "77" })).EnsureSuccessStatusCode();
+        (await bobSession.PutAsJsonAsync($"/api/portal/items/{bob.NumberItemId}/field", new { value = "4242424.25" })).EnsureSuccessStatusCode();
         (await bobSession.PutAsJsonAsync($"/api/portal/items/{bob.YesNoItemId}/note", new { note = "bob note" })).EnsureSuccessStatusCode();
         var bobFile = (await FilesAsync(bob.FileItemId)).Single();
 
         // Alice's view holds nothing of Bob's.
         var text = await (await aliceSession.GetAsync("/api/portal/invite")).Content.ReadAsStringAsync();
-        text.Should().NotContain("bob-secret").And.NotContain("bob note").And.NotContain("77")
+        text.Should().NotContain("bob-secret").And.NotContain("bob note").And.NotContain("4242424")
             .And.NotContain(bob.FileItemId.ToString()).And.NotContain(bob.Invite.Id.ToString())
             .And.NotContain(bobFile.Id.ToString());
 
@@ -453,7 +453,7 @@ public class PortalTests : PortalTestBase
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         var bobRow = await InviteRowAsync(bob.Invite.Id);
-        bobRow.Items.Single(i => i.Id == bob.NumberItemId).FieldValue.Should().Be("77");
+        bobRow.Items.Single(i => i.Id == bob.NumberItemId).FieldValue.Should().Be("4242424.25");
         bobRow.Items.Single(i => i.Id == bob.NumberItemId).PartyNote.Should().BeNull();
     }
 }

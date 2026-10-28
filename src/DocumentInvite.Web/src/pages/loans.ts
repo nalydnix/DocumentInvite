@@ -24,6 +24,12 @@ export interface LoanSummary {
   createdAt: string;
   completedAt: string | null;
   partyCount: number;
+  itemsTotal: number;
+  itemsApproved: number;
+  percentComplete: number;
+  /** The earliest due date of the invites still open, or null when none is. */
+  dueDate: string | null;
+  isOverdue: boolean;
 }
 
 
@@ -37,6 +43,28 @@ export interface InviteItem {
   isRequired: boolean;
   sortOrder: number;
   status: RequestItemStatus;
+  rejectionReason: string | null;
+  fieldValue: string | null;
+  partyNote: string | null;
+  reviewedAt: string | null;
+  files: ItemFile[];
+}
+
+export interface ItemFile {
+  id: string;
+  fileName: string;
+  originalFileName: string;
+  contentType: string;
+  sizeBytes: number;
+  sequence: number;
+  uploadedAt: string | null;
+}
+
+export interface ReadUrl {
+  url: string;
+  expiresAt: string;
+  fileName: string;
+  contentType: string;
 }
 
 export interface Invite {
@@ -56,7 +84,8 @@ export interface Invite {
   items: InviteItem[];
 }
 
-export interface Loan extends Omit<LoanSummary, 'partyCount'> {
+export interface Loan
+  extends Omit<LoanSummary, 'partyCount' | 'itemsTotal' | 'itemsApproved' | 'percentComplete' | 'dueDate' | 'isOverdue'> {
   invites: Invite[];
 }
 
@@ -65,4 +94,14 @@ export const LOAN_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;
 
 export function formatAmount(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}
+
+export function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

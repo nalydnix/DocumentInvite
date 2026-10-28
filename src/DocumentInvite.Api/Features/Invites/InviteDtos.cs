@@ -13,7 +13,22 @@ public sealed record InviteItemResponse(
     FieldType? FieldType,
     bool IsRequired,
     int SortOrder,
-    RequestItemStatus Status);
+    RequestItemStatus Status,
+    string? RejectionReason,
+    string? FieldValue,
+    string? PartyNote,
+    DateTimeOffset? ReviewedAt,
+    IReadOnlyList<ItemFileResponse> Files);
+
+/// <summary>An uploaded file as staff see it. Names are shown to staff only; they never reach the audit trail.</summary>
+public sealed record ItemFileResponse(
+    Guid Id,
+    string FileName,
+    string OriginalFileName,
+    string ContentType,
+    long SizeBytes,
+    int Sequence,
+    DateTimeOffset? UploadedAt);
 
 /// <summary>An invite as staff see it. The portal link is never returned: it is only emailed.</summary>
 public sealed record InviteResponse(

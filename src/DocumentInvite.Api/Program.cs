@@ -7,6 +7,7 @@ using DocumentInvite.Api.Features.Portal;
 using DocumentInvite.Api.Features.Templates;
 using DocumentInvite.Api.Features.Outbox;
 using DocumentInvite.Api.Features.Reminders;
+using DocumentInvite.Api.Features.Review;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,7 @@ builder.Services.AddEmail();
 builder.Services.AddReminders();
 builder.Services.AddFiles();
 builder.Services.AddPortal();
+builder.Services.AddReview();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

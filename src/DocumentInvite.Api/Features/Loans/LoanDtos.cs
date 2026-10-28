@@ -15,7 +15,12 @@ public sealed record LoanSummaryResponse(
     CollectionStatus Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
-    int PartyCount);
+    int PartyCount,
+    int ItemsTotal,
+    int ItemsApproved,
+    int PercentComplete,
+    DateOnly? DueDate,
+    bool IsOverdue);
 
 public sealed record LoanResponse(
     Guid Id,

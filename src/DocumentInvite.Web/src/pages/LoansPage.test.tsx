@@ -20,6 +20,11 @@ const summary: LoanSummary = {
   createdAt: '2027-01-05T10:00:00Z',
   completedAt: null,
   partyCount: 2,
+  itemsTotal: 4,
+  itemsApproved: 1,
+  percentComplete: 25,
+  dueDate: '2027-02-01',
+  isOverdue: false,
 };
 
 const annInvite: Invite = {
@@ -47,6 +52,11 @@ const annInvite: Invite = {
       isRequired: true,
       sortOrder: 0,
       status: 'Approved',
+      rejectionReason: null,
+      fieldValue: null,
+      partyNote: null,
+      reviewedAt: null,
+      files: [],
     },
     {
       id: 'it2',
@@ -58,6 +68,21 @@ const annInvite: Invite = {
       isRequired: true,
       sortOrder: 1,
       status: 'Submitted',
+      rejectionReason: null,
+      fieldValue: null,
+      partyNote: null,
+      reviewedAt: null,
+      files: [
+        {
+          id: 'f1',
+          fileName: 'LN-1001_Lee_Bank-statement_1.pdf',
+          originalFileName: 'scan.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 2048,
+          sequence: 1,
+          uploadedAt: '2027-01-06T10:00:00Z',
+        },
+      ],
     },
   ],
 };
@@ -263,7 +288,7 @@ describe('LoanDetailPage', () => {
     expect(await screen.findByRole('heading', { name: /LN-1001/ })).toBeInTheDocument();
     const parties = screen.getByRole('list', { name: 'Parties' });
     expect(within(parties).getByText('Ann Lee')).toBeInTheDocument();
-    expect(within(parties).getByText('Submitted')).toBeInTheDocument();
+    expect(within(parties).getAllByText('Submitted').length).toBeGreaterThan(0);
     expect(within(parties).getByText(/1 of 2 items approved/)).toBeInTheDocument();
   });
 
@@ -421,5 +446,34 @@ describe('LoanDetailPage', () => {
     renderRoutes('/loans/l9');
 
     expect(await screen.findByText('This loan does not exist.')).toBeInTheDocument();
+  });
+});
+
+describe('LoansPage dashboard', () => {
+  it('shows progress, due date and an overdue flag on each loan', async () => {
+    mockApi({
+      ...signedIn(['Viewer']),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([{ ...summary, isOverdue: true }])),
+    });
+
+    renderRoutes('/loans');
+
+    const list = await screen.findByRole('list', { name: 'Loans' });
+    expect(within(list).getByRole('progressbar', { name: 'Progress for LN-1001' })).toHaveAttribute('aria-valuenow', '25');
+    expect(within(list).getByText(/25% complete \(1 of 4 items approved\)/)).toBeInTheDocument();
+    expect(within(list).getByText(/due Feb 1, 2027/)).toBeInTheDocument();
+    expect(within(list).getByText('Overdue')).toBeInTheDocument();
+  });
+
+  it('does not flag a loan that is not overdue', async () => {
+    mockApi({
+      ...signedIn(['Viewer']),
+      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
+    });
+
+    renderRoutes('/loans');
+
+    await screen.findByRole('list', { name: 'Loans' });
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
   });
 });

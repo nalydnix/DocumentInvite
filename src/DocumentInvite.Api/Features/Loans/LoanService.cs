@@ -40,10 +40,24 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
             }
         }
 
+        // Progress and due date count only active (not revoked) invites. A loan is overdue when an
+        // active invite is past its due date and still has items the party has to provide.
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         return await loans
-            .Select(l => new { Loan = l, Parties = l.Invites.Count })
+            .Select(l => new
+            {
+                Loan = l,
+                Parties = l.Invites.Count,
+                Total = l.Invites.Where(i => i.RevokedAt == null).SelectMany(i => i.Items).Count(),
+                Approved = l.Invites.Where(i => i.RevokedAt == null).SelectMany(i => i.Items)
+                    .Count(x => x.Status == RequestItemStatus.Approved),
+                NextDue = l.Invites.Where(i => i.RevokedAt == null && i.Status != CollectionStatus.Completed)
+                    .Min(i => (DateOnly?)i.DueDate),
+                Overdue = l.Invites.Any(i => i.RevokedAt == null && i.DueDate < today &&
+                    i.Items.Any(x => x.Status == RequestItemStatus.Outstanding || x.Status == RequestItemStatus.Rejected)),
+            })
             .OrderByDescending(x => x.Loan.CreatedAt).ThenBy(x => x.Loan.Id)
-            .ToPagedResponseAsync(query, x => ToSummary(x.Loan, x.Parties), ct);
+            .ToPagedResponseAsync(query, x => ToSummary(x.Loan, x.Parties, x.Total, x.Approved, x.NextDue, x.Overdue), ct);
     }
 
     public async Task<LoanResult> GetAsync(Guid id, CancellationToken ct)
@@ -59,7 +73,9 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
 
         var contactIds = loan.Invites.Select(i => i.ContactId).ToList();
         var contacts = await db.Contacts.AsNoTracking().Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, ct);
-        return LoanResult.Ok(ToResponse(loan, contacts));
+        var itemIds = loan.Invites.SelectMany(i => i.Items).Select(i => i.Id).ToList();
+        var files = await InviteService.LoadFilesAsync(db, itemIds, ct);
+        return LoanResult.Ok(ToResponse(loan, contacts, files));
     }
 
     public async Task<LoanResult> CreateAsync(LoanRequest request, CancellationToken ct)
@@ -95,14 +111,17 @@ public sealed class LoanService(AppDbContext db, IAuditLog audit, IRequestContex
         return LoanResult.Ok(ToResponse(loan, new Dictionary<Guid, Contact>()));
     }
 
-    private static LoanSummaryResponse ToSummary(Loan l, int partyCount) => new(
-        l.Id, l.Reference, l.Name, l.Amount, l.LoanType, l.Status, l.CreatedAt, l.CompletedAt, partyCount);
+    private static LoanSummaryResponse ToSummary(
+        Loan l, int partyCount, int total, int approved, DateOnly? dueDate, bool overdue) => new(
+        l.Id, l.Reference, l.Name, l.Amount, l.LoanType, l.Status, l.CreatedAt, l.CompletedAt, partyCount,
+        total, approved, total == 0 ? 0 : (int)Math.Round(approved * 100.0 / total), dueDate, overdue);
 
     private static string EscapeLike(string term) =>
         term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");
 
-    private static LoanResponse ToResponse(Loan loan, IReadOnlyDictionary<Guid, Contact> contacts) => new(
+    private static LoanResponse ToResponse(
+        Loan loan, IReadOnlyDictionary<Guid, Contact> contacts, ILookup<Guid, StoredFile>? files = null) => new(
         loan.Id, loan.Reference, loan.Name, loan.Amount, loan.LoanType, loan.Status, loan.CreatedAt, loan.CompletedAt,
         loan.Invites.OrderBy(i => i.SentAt).ThenBy(i => i.Id)
-            .Select(i => InviteService.ToResponse(i, contacts[i.ContactId])).ToList());
+            .Select(i => InviteService.ToResponse(i, contacts[i.ContactId], files)).ToList());
 }
