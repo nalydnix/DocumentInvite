@@ -1,4 +1,5 @@
 import { apiBaseUrl } from '../lib/api';
+import type { PagedResponse } from '../lib/paging';
 
 export type ItemKind = 'FileUpload' | 'FormField';
 export type FieldType = 'Text' | 'Number' | 'Date' | 'YesNo';
@@ -271,3 +272,18 @@ export const uploadFile: UploadFunction = async (itemId, file, onProgress) => {
   onProgress({ fraction: 1, processing: true });
   return call<PortalFile>(`/api/portal/items/${itemId}/complete`, 'POST', { fileId: slot.fileId });
 };
+
+// ---- messages ----
+
+export interface PortalMessage {
+  id: string;
+  authorType: 'Team' | 'Party' | 'System';
+  body: string;
+  createdAt: string;
+}
+
+/** A page of the thread, newest first. Internal notes are never part of it. */
+export const listMessages = (page: number, pageSize: number) =>
+  call<PagedResponse<PortalMessage>>(`/api/portal/messages?page=${page}&pageSize=${pageSize}`);
+
+export const postMessage = (body: string) => call<PortalMessage>('/api/portal/messages', 'POST', { body });

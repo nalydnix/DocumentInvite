@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { ApiError, apiDownload, apiFetch } from '../lib/api';
 import { partyLabel } from './contacts';
 import { formatAmount, formatDate, LOAN_WRITER_ROLES, type Invite, type Loan } from './loans';
+import { InviteThread } from './InviteThread';
 import { ItemReview } from './ItemReview';
 import { SendInvitesPanel } from './SendInvitesPanel';
 
@@ -89,6 +90,7 @@ function InviteRow({ invite, canWrite }: { invite: Invite; canWrite: boolean }) 
           <ItemReview key={item.id} item={item} loanId={invite.loanId} canWrite={canWrite} />
         ))}
       </ul>
+      <InviteThread inviteId={invite.id} partyName={invite.partyName} canWrite={canWrite} />
       <ErrorList messages={[...messagesOf(revoke.error), ...messagesOf(reissue.error)]} />
       {reissue.isSuccess && <p role="status" className="text-sm text-ink-muted">A new link was emailed. The old link no longer works.</p>}
     </li>
