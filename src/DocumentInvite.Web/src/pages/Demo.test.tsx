@@ -52,6 +52,17 @@ describe('demo logins on the sign-in page', () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(screen.queryByRole('region', { name: 'Demo logins' })).not.toBeInTheDocument();
   });
+
+  it('explains what the app is for and who signs in', async () => {
+    mockApi({ 'GET /api/demo/config': () => jsonResponse(200, { enabled: false, logins: [] }) });
+    renderApp(<LoginPage />, '/login');
+
+    await screen.findByRole('button', { name: 'Sign in' });
+    expect(screen.getByText(/secure way to collect documents/i)).toBeInTheDocument();
+    expect(screen.getByText(/Accounts are created by an Admin/)).toBeInTheDocument();
+    expect(screen.getByText(/Use the link in the email you were sent/)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/borrower|loan|lender/i);
+  });
 });
 
 describe('Reset demo data', () => {
