@@ -37,7 +37,18 @@ export function LoginPage() {
       >
         <div>
           <h1 className="text-xl font-semibold text-brand-600">DocumentInvite</h1>
-          <p className="mt-1 text-sm text-ink-muted">Sign in to your lender account.</p>
+          <p className="mt-1 text-sm text-ink-muted">
+            A secure way to collect documents. Staff send requests to recipients, who upload through a private link.
+            Staff then review and approve what comes in.
+          </p>
+        </div>
+        <div className="space-y-1 rounded-card bg-surface-muted p-3 text-sm text-ink-muted">
+          <p>
+            <span className="font-medium">Staff:</span> sign in below. Accounts are created by an Admin.
+          </p>
+          <p>
+            <span className="font-medium">Recipients:</span> no sign-in needed. Use the link in the email you were sent.
+          </p>
         </div>
         <Field
           label="Email"
