@@ -25,7 +25,7 @@ function setup(roles: Role[], routes: Record<string, () => Response>) {
 
 describe('AppLayout unread badge', () => {
   it('shows the unread count next to Outbox', async () => {
-    setup(['LoanOfficer'], { 'GET /api/outbox/unread-count': () => jsonResponse(200, { count: 3 }) });
+    setup(['Requester'], { 'GET /api/outbox/unread-count': () => jsonResponse(200, { count: 3 }) });
 
     const link = await screen.findByRole('link', { name: /Outbox/ });
     await screen.findByText('3');
@@ -33,7 +33,7 @@ describe('AppLayout unread badge', () => {
   });
 
   it('hides the badge at zero', async () => {
-    setup(['LoanOfficer'], { 'GET /api/outbox/unread-count': () => jsonResponse(200, { count: 0 }) });
+    setup(['Requester'], { 'GET /api/outbox/unread-count': () => jsonResponse(200, { count: 0 }) });
 
     const link = await screen.findByRole('link', { name: 'Outbox' });
     expect(link).not.toHaveTextContent('unread');

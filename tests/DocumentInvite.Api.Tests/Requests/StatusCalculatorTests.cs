@@ -4,7 +4,7 @@ using FluentAssertions;
 using static DocumentInvite.Api.Domain.CollectionStatus;
 using static DocumentInvite.Api.Domain.RequestItemStatus;
 
-namespace DocumentInvite.Api.Tests.Loans;
+namespace DocumentInvite.Api.Tests.Requests;
 
 public class StatusCalculatorTests
 {
@@ -116,12 +116,12 @@ public class StatusCalculatorTests
             .Should().Be(CollectionStatus.Submitted);
     }
 
-    // ---- loan transitions ----
+    // ---- request transitions ----
 
     [Fact]
-    public void A_loan_without_active_invites_is_Sent()
+    public void A_request_without_active_invites_is_Sent()
     {
-        StatusCalculator.ForLoan([]).Should().Be(Sent);
+        StatusCalculator.ForRequest([]).Should().Be(Sent);
     }
 
     [Theory]
@@ -135,11 +135,11 @@ public class StatusCalculatorTests
     [InlineData(CollectionStatus.Submitted, CollectionStatus.Submitted, CollectionStatus.Submitted)]
     [InlineData(CollectionStatus.Submitted, Completed, CollectionStatus.Submitted)]
     [InlineData(Completed, Completed, ReadyToComplete)]
-    public void A_loan_is_derived_from_its_invites(
+    public void A_request_is_derived_from_its_invites(
         CollectionStatus first, CollectionStatus second, CollectionStatus expected)
     {
-        StatusCalculator.ForLoan([first, second]).Should().Be(expected);
-        StatusCalculator.ForLoan([second, first]).Should().Be(expected);
+        StatusCalculator.ForRequest([first, second]).Should().Be(expected);
+        StatusCalculator.ForRequest([second, first]).Should().Be(expected);
     }
 
     // ---- applying the result to entities ----
@@ -151,53 +151,53 @@ public class StatusCalculatorTests
     };
 
     [Fact]
-    public void Approving_every_invite_makes_the_loan_ReadyToComplete_without_stamping_CompletedAt()
+    public void Approving_every_invite_makes_the_request_ReadyToComplete_without_stamping_CompletedAt()
     {
-        var loan = new Loan { Invites = [InviteWith(true, Approved), InviteWith(true, Approved)] };
+        var request = new Request { Invites = [InviteWith(true, Approved), InviteWith(true, Approved)] };
 
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
 
-        loan.Status.Should().Be(ReadyToComplete);
-        loan.CompletedAt.Should().BeNull();
+        request.Status.Should().Be(ReadyToComplete);
+        request.CompletedAt.Should().BeNull();
     }
 
     [Fact]
-    public void A_completed_loan_stays_Completed_and_keeps_CompletedAt()
+    public void A_completed_request_stays_Completed_and_keeps_CompletedAt()
     {
         var stamped = DateTimeOffset.UnixEpoch;
-        var loan = new Loan { CompletedAt = stamped, Invites = [InviteWith(true, Approved)] };
-        loan.Invites[0].Items[0].Status = Rejected;
+        var request = new Request { CompletedAt = stamped, Invites = [InviteWith(true, Approved)] };
+        request.Invites[0].Items[0].Status = Rejected;
 
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
 
-        loan.Status.Should().Be(Completed);
-        loan.CompletedAt.Should().Be(stamped);
+        request.Status.Should().Be(Completed);
+        request.CompletedAt.Should().Be(stamped);
     }
 
     [Fact]
-    public void A_ReadyToComplete_loan_returns_to_InProgress_when_an_item_is_rejected()
+    public void A_ReadyToComplete_request_returns_to_InProgress_when_an_item_is_rejected()
     {
-        var loan = new Loan { Invites = [InviteWith(true, Approved)] };
-        StatusRecalculator.Apply(loan);
-        loan.Status.Should().Be(ReadyToComplete);
+        var request = new Request { Invites = [InviteWith(true, Approved)] };
+        StatusRecalculator.Apply(request);
+        request.Status.Should().Be(ReadyToComplete);
 
-        loan.Invites[0].Items[0].Status = Rejected;
-        StatusRecalculator.Apply(loan);
+        request.Invites[0].Items[0].Status = Rejected;
+        StatusRecalculator.Apply(request);
 
-        loan.Invites[0].Status.Should().Be(InProgress);
-        loan.Status.Should().Be(InProgress);
+        request.Invites[0].Status.Should().Be(InProgress);
+        request.Status.Should().Be(InProgress);
     }
 
     [Fact]
-    public void Revoked_invites_do_not_count_towards_the_loan_status()
+    public void Revoked_invites_do_not_count_towards_the_request_status()
     {
         var revoked = InviteWith(false, Outstanding);
         revoked.RevokedAt = DateTimeOffset.UnixEpoch;
-        var loan = new Loan { Invites = [revoked, InviteWith(true, Approved)] };
+        var request = new Request { Invites = [revoked, InviteWith(true, Approved)] };
 
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
 
-        loan.Status.Should().Be(ReadyToComplete);
+        request.Status.Should().Be(ReadyToComplete);
     }
 
     // ---- portal tokens ----

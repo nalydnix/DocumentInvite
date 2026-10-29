@@ -8,7 +8,7 @@ namespace DocumentInvite.Api.Features.Demo;
 [Route("api/demo")]
 public class DemoController(DemoService service) : ControllerBase
 {
-    /// <summary>Public: the sign-in page shows every configured demo login (Admin, LoanOfficer, Auditor) when demo mode is on.</summary>
+    /// <summary>Public: the sign-in page shows every configured demo login (Admin, Requester, Auditor) when demo mode is on.</summary>
     [HttpGet("config")]
     [AllowAnonymous]
     public DemoConfigResponse GetConfig() => service.GetConfig();

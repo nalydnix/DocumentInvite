@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace DocumentInvite.Api.Domain;
 
-/// <summary>A staff account (Admin, LoanOfficer or Auditor).</summary>
+/// <summary>A staff account (Admin, Requester or Auditor).</summary>
 public class AppUser : IdentityUser<Guid>
 {
     public string DisplayName { get; set; } = string.Empty;

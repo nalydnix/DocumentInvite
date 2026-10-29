@@ -23,7 +23,7 @@ public class AuthenticationTests : StaffTestBase
 
         var names = await db.Roles.Select(r => r.Name).ToListAsync();
 
-        names.Should().BeEquivalentTo("Admin", "LoanOfficer", "Auditor");
+        names.Should().BeEquivalentTo("Admin", "Requester", "Auditor");
     }
 
     [Theory]
@@ -42,15 +42,15 @@ public class AuthenticationTests : StaffTestBase
     [Fact]
     public async Task Sign_in_returns_bearer_tokens_and_me_returns_the_user_with_roles()
     {
-        await CreateUserAsync("officer@example.com", [StaffRoles.LoanOfficer]);
+        await CreateUserAsync("requester@example.com", [StaffRoles.Requester]);
 
-        var token = await SignInAsync("officer@example.com");
+        var token = await SignInAsync("requester@example.com");
         var client = NewClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
         var me = await client.GetFromJsonAsync<MeBody>("/api/me");
 
-        me!.Email.Should().Be("officer@example.com");
-        me.Roles.Should().BeEquivalentTo(StaffRoles.LoanOfficer);
+        me!.Email.Should().Be("requester@example.com");
+        me.Roles.Should().BeEquivalentTo(StaffRoles.Requester);
         token.RefreshToken.Should().NotBeNullOrEmpty();
     }
 
@@ -65,7 +65,7 @@ public class AuthenticationTests : StaffTestBase
     [Fact]
     public async Task The_refresh_token_issues_a_new_access_token()
     {
-        await CreateUserAsync("refresh@example.com", [StaffRoles.LoanOfficer]);
+        await CreateUserAsync("refresh@example.com", [StaffRoles.Requester]);
         var token = await SignInAsync("refresh@example.com");
 
         var response = await NewClient().PostAsJsonAsync("/api/auth/refresh", new { refreshToken = token.RefreshToken });

@@ -106,8 +106,8 @@ public sealed class FileCompletionService(
 
         var names = await db.RequestItems.AsNoTracking()
             .Where(i => i.Id == file.RequestItemId)
-            .Join(db.Invites, i => i.InviteId, v => v.Id, (i, v) => new { ItemName = i.Name, v.LoanId, v.ContactId })
-            .Join(db.Loans, x => x.LoanId, l => l.Id, (x, l) => new { x.ItemName, x.ContactId, l.Reference })
+            .Join(db.Invites, i => i.InviteId, v => v.Id, (i, v) => new { ItemName = i.Name, v.RequestId, v.ContactId })
+            .Join(db.Requests, x => x.RequestId, l => l.Id, (x, l) => new { x.ItemName, x.ContactId, l.Reference })
             .Join(db.Contacts, x => x.ContactId, c => c.Id, (x, c) => new { x.ItemName, x.Reference, c.LastName })
             .SingleAsync(ct);
 

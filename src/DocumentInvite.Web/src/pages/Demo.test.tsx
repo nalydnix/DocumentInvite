@@ -13,7 +13,7 @@ const demoOn = {
   enabled: true,
   logins: [
     { role: 'Admin', email: 'admin@demo.test', password: 'Demo-Admin-Passw0rd!' },
-    { role: 'LoanOfficer', email: 'officer@demo.test', password: 'Demo-Officer-Passw0rd!' },
+    { role: 'Requester', email: 'requester@demo.test', password: 'Demo-Requester-Passw0rd!' },
     { role: 'Auditor', email: 'auditor@demo.test', password: 'Demo-Auditor-Passw0rd!' },
   ],
 };
@@ -33,7 +33,7 @@ describe('demo logins on the sign-in page', () => {
 
     const panel = await screen.findByRole('region', { name: 'Demo logins' });
     expect(panel).toHaveTextContent('admin@demo.test');
-    expect(panel).toHaveTextContent('officer@demo.test');
+    expect(panel).toHaveTextContent('requester@demo.test');
     expect(panel).toHaveTextContent('auditor@demo.test');
 
     await userEvent.click(screen.getByRole('button', { name: 'Use the Auditor login' }));
@@ -64,7 +64,7 @@ describe('Reset demo data', () => {
       ...signedIn(),
       ...settingsRoutes,
       'GET /api/demo/config': () => jsonResponse(200, demoOn),
-      'POST /api/demo/reset': () => jsonResponse(200, { loans: 3, contacts: 3 }),
+      'POST /api/demo/reset': () => jsonResponse(200, { requests: 3, contacts: 3 }),
     });
     renderApp(<SettingsPage />);
     const user = userEvent.setup();
@@ -73,7 +73,7 @@ describe('Reset demo data', () => {
     expect(calls.some((c) => c.key === 'POST /api/demo/reset')).toBe(false);
     await user.click(screen.getByRole('button', { name: 'Yes, reset' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Demo data reset. 3 sample loans created.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Demo data reset. 3 sample requests created.');
     expect(calls.filter((c) => c.key === 'POST /api/demo/reset')).toHaveLength(1);
   });
 

@@ -3,15 +3,15 @@ using DocumentInvite.Api.Features.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DocumentInvite.Api.Features.Loans;
+namespace DocumentInvite.Api.Features.Requests;
 
 [ApiController]
-[Route("api/loans")]
-public class LoansController(LoanService service) : ControllerBase
+[Route("api/requests")]
+public class RequestsController(RequestService service) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = AuthPolicies.CanRead)]
-    public async Task<PagedResponse<LoanSummaryResponse>> List([FromQuery] LoanListQuery query, CancellationToken ct) =>
+    public async Task<PagedResponse<RequestSummaryResponse>> List([FromQuery] RequestListQuery query, CancellationToken ct) =>
         await service.ListAsync(query, ct);
 
     [HttpGet("{id:guid}")]
@@ -20,10 +20,10 @@ public class LoansController(LoanService service) : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = AuthPolicies.RequireStaff)]
-    public async Task<IActionResult> Create(LoanRequest request, CancellationToken ct)
+    public async Task<IActionResult> Create(SaveRequestRequest input, CancellationToken ct)
     {
-        var result = await service.CreateAsync(request, ct);
-        return result.Loan is { } loan ? CreatedAtAction(nameof(Get), new { id = loan.Id }, loan) : ToActionResult(result);
+        var result = await service.CreateAsync(input, ct);
+        return result.Request is { } request ? CreatedAtAction(nameof(Get), new { id = request.Id }, request) : ToActionResult(result);
     }
 
     [HttpPost("{id:guid}/complete")]
@@ -32,10 +32,10 @@ public class LoansController(LoanService service) : ControllerBase
 
     [HttpPost("{id:guid}/reopen")]
     [Authorize(Policy = AuthPolicies.RequireStaff)]
-    public async Task<IActionResult> Reopen(Guid id, ReopenLoanRequest request, CancellationToken ct) =>
-        ToActionResult(await service.ReopenAsync(id, request.Reason!, ct));
+    public async Task<IActionResult> Reopen(Guid id, ReopenRequestRequest input, CancellationToken ct) =>
+        ToActionResult(await service.ReopenAsync(id, input.Reason!, ct));
 
-    private IActionResult ToActionResult(LoanResult result)
+    private IActionResult ToActionResult(RequestResult result)
     {
         if (result.NotFound)
         {
@@ -47,12 +47,12 @@ public class LoansController(LoanService service) : ControllerBase
             return Problem(detail: result.Conflict, statusCode: StatusCodes.Status409Conflict);
         }
 
-        return Ok(result.Loan);
+        return Ok(result.Request);
     }
 }
 
-public static class LoansServiceCollectionExtensions
+public static class RequestsServiceCollectionExtensions
 {
-    public static IServiceCollection AddLoans(this IServiceCollection services) =>
-        services.AddScoped<LoanService>();
+    public static IServiceCollection AddRequests(this IServiceCollection services) =>
+        services.AddScoped<RequestService>();
 }

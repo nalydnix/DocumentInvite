@@ -6,7 +6,7 @@ import { InviteThread, type StaffMessage } from './InviteThread';
 afterEach(resetSession);
 
 const messages: StaffMessage[] = [
-  { id: 'm3', authorType: 'Team', authorName: 'Sam Officer', body: 'Secret note', isInternal: true, createdAt: '2027-01-07T10:00:00Z' },
+  { id: 'm3', authorType: 'Team', authorName: 'Sam Requester', body: 'Secret note', isInternal: true, createdAt: '2027-01-07T10:00:00Z' },
   { id: 'm2', authorType: 'Party', authorName: null, body: 'Where do I upload it?', isInternal: false, createdAt: '2027-01-06T10:00:00Z' },
   { id: 'm1', authorType: 'System', authorName: null, body: 'Tax return was rejected: blurry', isInternal: false, createdAt: '2027-01-05T10:00:00Z' },
 ];

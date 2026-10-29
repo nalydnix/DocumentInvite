@@ -17,7 +17,7 @@ public sealed class DemoService(
         }
 
         var logins = new List<DemoLogin>();
-        foreach (var role in new[] { StaffRoles.Admin, StaffRoles.LoanOfficer, StaffRoles.Auditor })
+        foreach (var role in new[] { StaffRoles.Admin, StaffRoles.Requester, StaffRoles.Auditor })
         {
             if (options.Value.Accounts.TryGetValue(role, out var account) && account.IsComplete)
             {
@@ -29,7 +29,7 @@ public sealed class DemoService(
     }
 
     /// <summary>
-    /// Deletes the loans, contacts, emails and files, then seeds them again. The audit log is kept
+    /// Deletes the requests, contacts, emails and files, then seeds them again. The audit log is kept
     /// and the reset is recorded in it. Returns null when demo mode is off.
     /// </summary>
     public async Task<DemoResetResponse?> ResetAsync(CancellationToken ct)
@@ -50,16 +50,16 @@ public sealed class DemoService(
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
             // Invites, items, files and messages are removed by the database cascade.
-            await db.Loans.ExecuteDeleteAsync(ct);
+            await db.Requests.ExecuteDeleteAsync(ct);
             await db.Contacts.ExecuteDeleteAsync(ct);
             await db.OutboxEmails.ExecuteDeleteAsync(ct);
             db.ChangeTracker.Clear();
 
-            await seeder.SeedLoansAsync(seedAudit, newBlobs, ct);
+            await seeder.SeedRequestsAsync(seedAudit, newBlobs, ct);
 
             await audit.RecordAsync(
                 "demo.reset", new AuditTarget("demo"),
-                AuditDetails.Empty.WithCount("loanCount", DemoSeeder.References.Length), ct);
+                AuditDetails.Empty.WithCount("requestCount", DemoSeeder.References.Length), ct);
             await transaction.CommitAsync(ct);
         }
         catch

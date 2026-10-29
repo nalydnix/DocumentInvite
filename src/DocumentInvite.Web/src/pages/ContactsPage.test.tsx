@@ -44,7 +44,7 @@ function renderRoutes(route: string) {
 describe('ContactsPage', () => {
   it('lists contacts with their party type and a create link for writers', async () => {
     mockApi({
-      ...signedIn(['LoanOfficer']),
+      ...signedIn(['Requester']),
       'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann, bob])),
     });
 
@@ -106,7 +106,7 @@ describe('ContactsPage', () => {
 describe('ContactFormPage', () => {
   it('creates a contact and returns to the list', async () => {
     const { calls } = mockApi({
-      ...signedIn(['LoanOfficer']),
+      ...signedIn(['Requester']),
       'POST /api/contacts': () => jsonResponse(201, ann),
       'GET /api/contacts?page=1&pageSize=25': () => jsonResponse(200, page([ann])),
     });

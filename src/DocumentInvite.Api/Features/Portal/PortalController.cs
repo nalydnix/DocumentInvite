@@ -17,7 +17,7 @@ using Microsoft.Extensions.Options;
 namespace DocumentInvite.Api.Features.Portal;
 
 /// <summary>
-/// The borrower portal API. Only the portal session scheme is accepted: a staff token is refused, and a
+/// The recipient portal API. Only the portal session scheme is accepted: a staff token is refused, and a
 /// portal session is refused by every staff endpoint.
 /// </summary>
 [ApiController]
@@ -31,8 +31,8 @@ public class PortalController(PortalService service, MessagingService messaging)
     [HttpPost("session")]
     [AllowAnonymous]
     [EnableRateLimiting(PortalAuth.RateLimitPolicy)]
-    public async Task<IActionResult> CreateSession(PortalSessionRequest request, CancellationToken ct) =>
-        ToActionResult(await service.ExchangeAsync(request.Token!, request.Password, ct));
+    public async Task<IActionResult> CreateSession(PortalSessionRequest input, CancellationToken ct) =>
+        ToActionResult(await service.ExchangeAsync(input.Token!, input.Password, ct));
 
     [HttpGet("invite")]
     public async Task<IActionResult> GetInvite(CancellationToken ct) =>
@@ -46,20 +46,20 @@ public class PortalController(PortalService service, MessagingService messaging)
     }
 
     [HttpPost("items/{itemId:guid}/upload-slot")]
-    public async Task<IActionResult> UploadSlot(Guid itemId, UploadSlotRequest request, CancellationToken ct) =>
-        ToActionResult(await service.CreateUploadSlotAsync(InviteId, itemId, request, ct));
+    public async Task<IActionResult> UploadSlot(Guid itemId, UploadSlotRequest input, CancellationToken ct) =>
+        ToActionResult(await service.CreateUploadSlotAsync(InviteId, itemId, input, ct));
 
     [HttpPost("items/{itemId:guid}/complete")]
-    public async Task<IActionResult> Complete(Guid itemId, CompleteUploadRequest request, CancellationToken ct) =>
-        ToActionResult(await service.CompleteUploadAsync(InviteId, itemId, request.FileId!.Value, ct));
+    public async Task<IActionResult> Complete(Guid itemId, CompleteUploadRequest input, CancellationToken ct) =>
+        ToActionResult(await service.CompleteUploadAsync(InviteId, itemId, input.FileId!.Value, ct));
 
     [HttpPut("items/{itemId:guid}/field")]
-    public async Task<IActionResult> SaveField(Guid itemId, SaveFieldRequest request, CancellationToken ct) =>
-        ToActionResult(await service.SaveFieldAsync(InviteId, itemId, request.Value, ct));
+    public async Task<IActionResult> SaveField(Guid itemId, SaveFieldRequest input, CancellationToken ct) =>
+        ToActionResult(await service.SaveFieldAsync(InviteId, itemId, input.Value, ct));
 
     [HttpPut("items/{itemId:guid}/note")]
-    public async Task<IActionResult> SaveNote(Guid itemId, SaveNoteRequest request, CancellationToken ct) =>
-        ToActionResult(await service.SaveNoteAsync(InviteId, itemId, request.Note, ct));
+    public async Task<IActionResult> SaveNote(Guid itemId, SaveNoteRequest input, CancellationToken ct) =>
+        ToActionResult(await service.SaveNoteAsync(InviteId, itemId, input.Note, ct));
 
     /// <summary>The thread, newest first. Internal notes are never returned here.</summary>
     [HttpGet("messages")]
@@ -67,9 +67,9 @@ public class PortalController(PortalService service, MessagingService messaging)
         ToActionResult(await messaging.ListForPartyAsync(InviteId, query, ct));
 
     [HttpPost("messages")]
-    public async Task<IActionResult> PostMessage(PostMessageRequest request, CancellationToken ct)
+    public async Task<IActionResult> PostMessage(PostMessageRequest input, CancellationToken ct)
     {
-        var result = await messaging.PostPartyMessageAsync(InviteId, request.Body!, ct);
+        var result = await messaging.PostPartyMessageAsync(InviteId, input.Body!, ct);
         return result.Succeeded ? StatusCode(StatusCodes.Status201Created, result.Value) : ToActionResult(result);
     }
 
@@ -97,7 +97,7 @@ public class PortalController(PortalService service, MessagingService messaging)
         result.Failure switch
         {
             PortalFailure.LinkNotFound => (404, "link_not_found", "This link is not valid",
-                "We could not find this request. Check that you opened the whole link from your email."),
+                "We could not find this input. Check that you opened the whole link from your email."),
             PortalFailure.LinkRevoked => (410, "link_revoked", "This link is no longer active",
                 "This link was withdrawn. Contact your lender for a new one."),
             PortalFailure.LinkExpired => (410, "link_expired", "This link has expired",
@@ -111,8 +111,8 @@ public class PortalController(PortalService service, MessagingService messaging)
                 "Accept the privacy notice before you add anything."),
             PortalFailure.ItemLocked => (409, "item_locked", "This item is approved",
                 "This item has already been approved and can no longer be changed."),
-            PortalFailure.LoanLocked => (409, "loan_completed", "This request is completed",
-                "This loan is completed and locked. Ask your lender to reopen the loan before making changes."),
+            PortalFailure.RequestLocked => (409, "request_completed", "This request is completed",
+                "This request is completed and locked. Ask your lender to reopen the request before making changes."),
             PortalFailure.File => DescribeFile(result.FileError!.Value),
             _ => (400, "invalid", "The request is not valid", "The request is not valid."),
         };

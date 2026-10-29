@@ -33,7 +33,7 @@ public sealed record ItemFileResponse(
 /// <summary>An invite as staff see it. The portal link is never returned: it is only emailed.</summary>
 public sealed record InviteResponse(
     Guid Id,
-    Guid LoanId,
+    Guid RequestId,
     Guid ContactId,
     string PartyName,
     string PartyEmail,
@@ -47,7 +47,7 @@ public sealed record InviteResponse(
     bool HasPassword,
     IReadOnlyList<InviteItemResponse> Items);
 
-/// <summary>One item to request. The officer may have edited the name and instructions copied from a template.</summary>
+/// <summary>One item to request. The requester may have edited the name and instructions copied from a template.</summary>
 public sealed record InviteItemRequest(
     string? Name,
     ItemKind? Kind,

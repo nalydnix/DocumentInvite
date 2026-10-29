@@ -11,12 +11,12 @@ import { useClampPage, usePaging, type PagedResponse } from '../lib/paging';
 import {
   formatAmount,
   formatDate,
-  LOAN_WRITER_ROLES,
+  REQUEST_WRITER_ROLES,
   STATUSES,
   STATUS_LABELS,
   type CollectionStatus,
-  type LoanSummary,
-} from './loans';
+  type RequestSummary,
+} from './requests';
 
 function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -27,77 +27,77 @@ function useDebounced<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-function LoanCard({ loan }: { loan: LoanSummary }) {
-  const label = `Progress for ${loan.reference}`;
+function RequestCard({ request }: { request: RequestSummary }) {
+  const label = `Progress for ${request.reference}`;
   return (
     <li className="grid gap-3 rounded-card border border-surface-border bg-surface p-4 shadow-card md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_auto] md:items-center">
       <div className="min-w-0">
-        <Link to={`/loans/${loan.id}`} className="font-medium text-brand-700 hover:underline">
-          {loan.reference} &middot; {loan.name}
+        <Link to={`/requests/${request.id}`} className="font-medium text-brand-700 hover:underline">
+          {request.reference} &middot; {request.name}
         </Link>
         <p className="text-sm text-ink-muted">
-          {loan.loanType} &middot; {formatAmount(loan.amount)} &middot; {loan.partyCount}{' '}
-          {loan.partyCount === 1 ? 'party' : 'parties'}
+          {request.requestType} &middot; {formatAmount(request.amount)} &middot; {request.partyCount}{' '}
+          {request.partyCount === 1 ? 'party' : 'parties'}
         </p>
       </div>
       <div className="space-y-1">
-        <ProgressBar percent={loan.percentComplete} label={label} />
+        <ProgressBar percent={request.percentComplete} label={label} />
         <p className="text-sm text-ink-muted">
-          {loan.percentComplete}% complete ({loan.itemsApproved} of {loan.itemsTotal} items approved)
-          {loan.dueDate && <> &middot; due {formatDate(loan.dueDate)}</>}
+          {request.percentComplete}% complete ({request.itemsApproved} of {request.itemsTotal} items approved)
+          {request.dueDate && <> &middot; due {formatDate(request.dueDate)}</>}
         </p>
       </div>
       <div className="flex items-center gap-2 md:justify-end">
-        {loan.isOverdue && (
+        {request.isOverdue && (
           <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Overdue</span>
         )}
-        <StatusBadge status={loan.status} />
+        <StatusBadge status={request.status} />
       </div>
     </li>
   );
 }
 
-export function LoansPage() {
+export function RequestsPage() {
   const { state } = useAuth();
-  const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, LOAN_WRITER_ROLES);
+  const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, REQUEST_WRITER_ROLES);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CollectionStatus | ''>('');
   const paging = usePaging();
   const term = useDebounced(search.trim(), 250);
 
-  const loans = useQuery({
-    queryKey: ['loans', term, status, paging.page, paging.pageSize],
+  const requests = useQuery({
+    queryKey: ['requests', term, status, paging.page, paging.pageSize],
     queryFn: () => {
       const params = paging.params();
       if (term) params.set('search', term);
       if (status) params.set('status', status);
-      return apiFetch<PagedResponse<LoanSummary>>(`/api/loans?${params}`);
+      return apiFetch<PagedResponse<RequestSummary>>(`/api/requests?${params}`);
     },
     placeholderData: keepPreviousData,
   });
 
-  const data = loans.data;
+  const data = requests.data;
   useClampPage(paging, data?.total);
   const filtered = term !== '' || status !== '';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-ink">Loans</h1>
+        <h1 className="text-xl font-semibold text-ink">Requests</h1>
         {canWrite && (
-          <Link to="/loans/new" className={primaryButtonClass}>
-            New loan
+          <Link to="/requests/new" className={primaryButtonClass}>
+            New request
           </Link>
         )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block text-sm font-medium text-ink sm:col-span-2">
-          Search loans
+          Search requests
           <input
             type="search"
             className={inputClass}
-            placeholder="Reference, name or loan type"
+            placeholder="Reference, name or request type"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -125,17 +125,17 @@ export function LoansPage() {
         </label>
       </div>
 
-      {loans.isPending && <p className="text-sm text-ink-muted">Loading loans...</p>}
-      {loans.isError && (
-        <ErrorList messages={loans.error instanceof ApiError ? loans.error.messages : ['Could not load loans.']} />
+      {requests.isPending && <p className="text-sm text-ink-muted">Loading requests...</p>}
+      {requests.isError && (
+        <ErrorList messages={requests.error instanceof ApiError ? requests.error.messages : ['Could not load requests.']} />
       )}
       {data && data.items.length === 0 && (
-        <p className="text-sm text-ink-muted">{filtered ? 'No loans match your search.' : 'No loans yet.'}</p>
+        <p className="text-sm text-ink-muted">{filtered ? 'No requests match your search.' : 'No requests yet.'}</p>
       )}
       {data && data.items.length > 0 && (
-        <ul className="space-y-3" aria-label="Loans">
-          {data.items.map((loan) => (
-            <LoanCard key={loan.id} loan={loan} />
+        <ul className="space-y-3" aria-label="Requests">
+          {data.items.map((request) => (
+            <RequestCard key={request.id} request={request} />
           ))}
         </ul>
       )}

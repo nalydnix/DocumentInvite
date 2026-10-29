@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace DocumentInvite.Api.Domain;
 
-/// <summary>The four collection states shared by invites and loans.</summary>
+/// <summary>The four collection states shared by invites and requests.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum CollectionStatus
 {
@@ -11,7 +11,7 @@ public enum CollectionStatus
     Submitted,
     Completed,
 
-    /// <summary>Loan only: every item on every active invite is Approved, awaiting the explicit complete action.</summary>
+    /// <summary>Request only: every item on every active invite is Approved, awaiting the explicit complete action.</summary>
     ReadyToComplete,
 }
 
@@ -24,8 +24,8 @@ public enum RequestItemStatus
     Rejected,
 }
 
-/// <summary>A loan for which documents are collected from one or more parties.</summary>
-public class Loan
+/// <summary>A request for which documents are collected from one or more parties.</summary>
+public class Request
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -34,25 +34,25 @@ public class Loan
 
     public string Name { get; set; } = string.Empty;
     public decimal Amount { get; set; }
-    public string LoanType { get; set; } = string.Empty;
+    public string RequestType { get; set; } = string.Empty;
     public Guid? CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>Stamped by the explicit complete action, cleared on reopen. Starts the retention period and locks the loan.</summary>
+    /// <summary>Stamped by the explicit complete action, cleared on reopen. Starts the retention period and locks the request.</summary>
     public DateTimeOffset? CompletedAt { get; set; }
 
-    /// <summary>Derived from the loan's invites by <c>StatusCalculator</c> and stored for filtering.</summary>
+    /// <summary>Derived from the request's invites by <c>StatusCalculator</c> and stored for filtering.</summary>
     public CollectionStatus Status { get; set; } = CollectionStatus.Sent;
 
     public byte[] RowVersion { get; set; } = [];
     public List<Invite> Invites { get; set; } = [];
 }
 
-/// <summary>One party's request on one loan, opened through a secure link.</summary>
+/// <summary>One party's request on one request, opened through a secure link.</summary>
 public class Invite
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid LoanId { get; set; }
+    public Guid RequestId { get; set; }
     public Guid ContactId { get; set; }
     public DateOnly DueDate { get; set; }
     public int ReminderIntervalDays { get; set; }

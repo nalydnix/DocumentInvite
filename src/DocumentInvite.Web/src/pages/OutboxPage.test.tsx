@@ -14,7 +14,7 @@ const newer = {
   deliveryError: 'Resend rejected the email (HTTP 422).',
   isRead: true,
 };
-const older = { ...newer, id: 'e1', subject: 'Documents requested for Loan 42', createdAt: '2027-03-01T10:00:00.000Z', provider: 'Demo', deliveryError: null };
+const older = { ...newer, id: 'e1', subject: 'Documents requested for Request 42', createdAt: '2027-03-01T10:00:00.000Z', provider: 'Demo', deliveryError: null };
 const detail = {
   ...older,
   providerMessageId: null,
@@ -26,7 +26,7 @@ function signedIn() {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
   return {
     'POST /api/auth/refresh': () => jsonResponse(200, tokens),
-    'GET /api/me': () => jsonResponse(200, meBody(['LoanOfficer'])),
+    'GET /api/me': () => jsonResponse(200, meBody(['Requester'])),
   };
 }
 
@@ -40,7 +40,7 @@ describe('OutboxPage', () => {
     const rows = within(list).getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('Reminder: 2 items still needed');
     expect(rows[0]).toHaveTextContent('Not delivered');
-    expect(rows[1]).toHaveTextContent('Documents requested for Loan 42');
+    expect(rows[1]).toHaveTextContent('Documents requested for Request 42');
     expect(rows[1]).not.toHaveTextContent('Not delivered');
   });
 
@@ -52,7 +52,7 @@ describe('OutboxPage', () => {
     });
     renderApp(<OutboxPage />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /Documents requested for Loan 42/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Documents requested for Request 42/ }));
 
     const frame = (await screen.findByTitle('Email preview')) as HTMLIFrameElement;
     expect(frame.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox');
@@ -180,7 +180,7 @@ describe('OutboxPage', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
-    expect(await screen.findByText('Documents requested for Loan 42')).toBeInTheDocument();
+    expect(await screen.findByText('Documents requested for Request 42')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 

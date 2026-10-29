@@ -13,7 +13,7 @@ public enum PartyType
     Accountant,
 }
 
-/// <summary>A person who can be added to a loan as a party.</summary>
+/// <summary>A person who can be added to a request as a party.</summary>
 public class Contact
 {
     public Guid Id { get; set; } = Guid.NewGuid();

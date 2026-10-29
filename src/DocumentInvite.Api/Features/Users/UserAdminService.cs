@@ -48,21 +48,21 @@ public sealed class UserAdminService(
         return user is null ? UserResult.Missing() : UserResult.Ok(await ToResponseAsync(user));
     }
 
-    public async Task<UserResult> CreateAsync(CreateUserRequest request, CancellationToken ct)
+    public async Task<UserResult> CreateAsync(CreateUserRequest input, CancellationToken ct)
     {
-        var role = request.Role!;
+        var role = input.Role!;
         var user = new AppUser
         {
-            UserName = request.Email,
-            Email = request.Email,
+            UserName = input.Email,
+            Email = input.Email,
             EmailConfirmed = true,
-            DisplayName = request.DisplayName!.Trim(),
-            AccessExpiresAt = request.AccessExpiresAt,
+            DisplayName = input.DisplayName!.Trim(),
+            AccessExpiresAt = input.AccessExpiresAt,
         };
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        var created = await users.CreateAsync(user, request.Password!);
+        var created = await users.CreateAsync(user, input.Password!);
         if (!created.Succeeded)
         {
             return FromIdentityErrors(created);
@@ -82,7 +82,7 @@ public sealed class UserAdminService(
         return UserResult.Ok(ToResponse(user, role));
     }
 
-    public async Task<UserResult> SetRoleAsync(Guid id, SetRoleRequest request, CancellationToken ct)
+    public async Task<UserResult> SetRoleAsync(Guid id, SetRoleRequest input, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(id.ToString());
         if (user is null)
@@ -90,7 +90,7 @@ public sealed class UserAdminService(
             return UserResult.Missing();
         }
 
-        var wanted = request.Role!;
+        var wanted = input.Role!;
         var current = (await users.GetRolesAsync(user)).ToList();
         var added = current.Contains(wanted) ? new List<string>() : [wanted];
         var removed = current.Where(r => r != wanted).ToList();
@@ -130,7 +130,7 @@ public sealed class UserAdminService(
         return UserResult.Ok(ToResponse(user, wanted));
     }
 
-    public async Task<UserResult> SetAccessExpiryAsync(Guid id, SetAccessExpiryRequest request, CancellationToken ct)
+    public async Task<UserResult> SetAccessExpiryAsync(Guid id, SetAccessExpiryRequest input, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(id.ToString());
         if (user is null)
@@ -138,18 +138,18 @@ public sealed class UserAdminService(
             return UserResult.Missing();
         }
 
-        if (request.AccessExpiresAt is not null && !await users.IsInRoleAsync(user, StaffRoles.Auditor))
+        if (input.AccessExpiresAt is not null && !await users.IsInRoleAsync(user, StaffRoles.Auditor))
         {
             return UserResult.Invalid("accessExpiresAt", "An access expiry date can only be set for an Auditor.");
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        user.AccessExpiresAt = request.AccessExpiresAt;
+        user.AccessExpiresAt = input.AccessExpiresAt;
         await users.UpdateAsync(user);
         await audit.RecordAsync(
             "user.access_expiry_changed", new AuditTarget("user", user.Id),
-            AuditDetails.Empty.WithEnum("change", request.AccessExpiresAt is null ? ExpiryChange.Cleared : ExpiryChange.Set),
+            AuditDetails.Empty.WithEnum("change", input.AccessExpiresAt is null ? ExpiryChange.Cleared : ExpiryChange.Set),
             ct);
         await transaction.CommitAsync(ct);
 
@@ -177,7 +177,7 @@ public sealed class UserAdminService(
     private async Task<UserResponse> ToResponseAsync(AppUser user) =>
         ToResponse(user, HighestRole(await users.GetRolesAsync(user)));
 
-    /// <summary>The most privileged of the given roles (Admin, LoanOfficer, Auditor), if any.</summary>
+    /// <summary>The most privileged of the given roles (Admin, Requester, Auditor), if any.</summary>
     private static string HighestRole(IEnumerable<string> roles) =>
         StaffRoles.All.FirstOrDefault(roles.Contains) ?? string.Empty;
 

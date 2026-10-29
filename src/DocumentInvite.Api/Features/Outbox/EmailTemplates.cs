@@ -6,17 +6,17 @@ namespace DocumentInvite.Api.Features.Outbox;
 
 public sealed record EmailContent(string Subject, string Html, string Text);
 
-public sealed record InviteEmailModel(string RecipientName, string LoanName, string PortalLink, DateOnly DueDate, int ItemCount);
+public sealed record InviteEmailModel(string RecipientName, string RequestName, string PortalLink, DateOnly DueDate, int ItemCount);
 
-public sealed record ReminderEmailModel(string RecipientName, string LoanName, string PortalLink, DateOnly DueDate, int OutstandingCount);
+public sealed record ReminderEmailModel(string RecipientName, string RequestName, string PortalLink, DateOnly DueDate, int OutstandingCount);
 
-public sealed record OverdueEmailModel(string RecipientName, string LoanName, string PortalLink, DateOnly DueDate, int OutstandingCount);
+public sealed record OverdueEmailModel(string RecipientName, string RequestName, string PortalLink, DateOnly DueDate, int OutstandingCount);
 
-public sealed record ItemRejectedEmailModel(string RecipientName, string LoanName, string ItemName, string Reason, string PortalLink);
+public sealed record ItemRejectedEmailModel(string RecipientName, string RequestName, string ItemName, string Reason, string PortalLink);
 
-public sealed record NewMessageEmailModel(string RecipientName, string LoanName, string PortalLink);
+public sealed record NewMessageEmailModel(string RecipientName, string RequestName, string PortalLink);
 
-public sealed record NewPartyMessageEmailModel(string RecipientName, string LoanName, string PartyName, string LoanLink);
+public sealed record NewPartyMessageEmailModel(string RecipientName, string RequestName, string PartyName, string RequestLink);
 
 /// <summary>
 /// Pure functions that build the six emails, each with an HTML and a text body that both carry
@@ -26,55 +26,55 @@ public sealed record NewPartyMessageEmailModel(string RecipientName, string Loan
 public static class EmailTemplates
 {
     public static EmailContent Invite(InviteEmailModel m) => Build(
-        $"Documents requested for {m.LoanName}",
+        $"Documents requested for {m.RequestName}",
         m.RecipientName, m.PortalLink, "Open your secure portal",
         [
-            $"You have been asked to provide {Items(m.ItemCount)} for {m.LoanName}.",
+            $"You have been asked to provide {Items(m.ItemCount)} for {m.RequestName}.",
             $"Please complete your checklist by {Date(m.DueDate)}. You do not need an account: the secure link below is just for you.",
         ]);
 
     public static EmailContent Reminder(ReminderEmailModel m) => Build(
-        $"Reminder: {Items(m.OutstandingCount)} still needed for {m.LoanName}",
+        $"Reminder: {Items(m.OutstandingCount)} still needed for {m.RequestName}",
         m.RecipientName, m.PortalLink, "Continue in your portal",
         [
-            $"{Items(m.OutstandingCount, capitalise: true)} still outstanding for {m.LoanName}.",
+            $"{Items(m.OutstandingCount, capitalise: true)} still outstanding for {m.RequestName}.",
             $"Please complete them by {Date(m.DueDate)}.",
         ]);
 
     public static EmailContent Overdue(OverdueEmailModel m) => Build(
-        $"Overdue: documents for {m.LoanName}",
+        $"Overdue: documents for {m.RequestName}",
         m.RecipientName, m.PortalLink, "Complete your checklist now",
         [
-            $"Your documents for {m.LoanName} were due on {Date(m.DueDate)} and {Items(m.OutstandingCount)} still outstanding.",
+            $"Your documents for {m.RequestName} were due on {Date(m.DueDate)} and {Items(m.OutstandingCount)} still outstanding.",
             "Please complete them as soon as you can, or reply to your lender contact if you need more time.",
         ]);
 
     public static EmailContent ItemRejected(ItemRejectedEmailModel m) => Build(
-        $"Action needed on \"{m.ItemName}\" for {m.LoanName}",
+        $"Action needed on \"{m.ItemName}\" for {m.RequestName}",
         m.RecipientName, m.PortalLink, "Review and resubmit",
         [
-            $"Your lender could not accept \"{m.ItemName}\" for {m.LoanName}.",
+            $"Your lender could not accept \"{m.ItemName}\" for {m.RequestName}.",
             $"Reason: {m.Reason}",
             "Please open your portal and submit it again.",
         ]);
 
     public static EmailContent NewMessage(NewMessageEmailModel m) => Build(
-        $"New message about {m.LoanName}",
+        $"New message about {m.RequestName}",
         m.RecipientName, m.PortalLink, "Read the message",
         [
-            $"You have a new message from your lender about {m.LoanName}.",
+            $"You have a new message from your lender about {m.RequestName}.",
             "For your security, messages are shown only in your secure portal.",
         ]);
 
-    /// <summary>Tells a staff member that a party replied. The link opens the loan page, which needs a sign-in.</summary>
+    /// <summary>Tells a staff member that a party replied. The link opens the request page, which needs a sign-in.</summary>
     public static EmailContent NewPartyMessage(NewPartyMessageEmailModel m) => Build(
-        $"New message from {m.PartyName} about {m.LoanName}",
-        m.RecipientName, m.LoanLink, "Open the loan",
+        $"New message from {m.PartyName} about {m.RequestName}",
+        m.RecipientName, m.RequestLink, "Open the request",
         [
-            $"{m.PartyName} sent you a message about {m.LoanName}.",
-            "Sign in and open the loan to read and reply.",
+            $"{m.PartyName} sent you a message about {m.RequestName}.",
+            "Sign in and open the request to read and reply.",
         ],
-        footer: "You are receiving this because you created this loan.");
+        footer: "You are receiving this because you created this request.");
 
     private static string Items(int count, bool capitalise = false)
     {

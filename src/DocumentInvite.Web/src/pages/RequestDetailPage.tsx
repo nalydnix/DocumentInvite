@@ -6,7 +6,7 @@ import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from 
 import { StatusBadge } from '../components/StatusBadge';
 import { ApiError, apiDownload, apiFetch } from '../lib/api';
 import { partyLabel } from './contacts';
-import { formatAmount, formatDate, LOAN_WRITER_ROLES, type Invite, type Loan } from './loans';
+import { formatAmount, formatDate, REQUEST_WRITER_ROLES, type Invite, type Request } from './requests';
 import { InviteThread } from './InviteThread';
 import { ItemReview } from './ItemReview';
 import { SendInvitesPanel } from './SendInvitesPanel';
@@ -18,8 +18,8 @@ function messagesOf(error: unknown): string[] {
 function InviteRow({ invite, canWrite, locked }: { invite: Invite; canWrite: boolean; locked: boolean }) {
   const queryClient = useQueryClient();
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['loan', invite.loanId] });
-    await queryClient.invalidateQueries({ queryKey: ['loans'] });
+    await queryClient.invalidateQueries({ queryKey: ['request', invite.requestId] });
+    await queryClient.invalidateQueries({ queryKey: ['requests'] });
   };
   const revoke = useMutation({
     mutationFn: () => apiFetch<Invite>(`/api/invites/${invite.id}/revoke`, { method: 'POST' }),
@@ -88,7 +88,7 @@ function InviteRow({ invite, canWrite, locked }: { invite: Invite; canWrite: boo
       )}
       <ul className="space-y-3 rounded-lg bg-surface-muted p-3" aria-label={`Items for ${invite.partyName}`}>
         {invite.items.map((item) => (
-          <ItemReview key={item.id} item={item} loanId={invite.loanId} canWrite={canWrite} locked={locked} />
+          <ItemReview key={item.id} item={item} requestId={invite.requestId} canWrite={canWrite} locked={locked} />
         ))}
       </ul>
       <InviteThread inviteId={invite.id} partyName={invite.partyName} canWrite={canWrite} />
@@ -98,28 +98,28 @@ function InviteRow({ invite, canWrite, locked }: { invite: Invite; canWrite: boo
   );
 }
 
-/** Complete and reopen actions for the loan, with the API's refusals shown to the user. */
-function CompletionPanel({ loan }: { loan: Loan }) {
+/** Complete and reopen actions for the request, with the API's refusals shown to the user. */
+function CompletionPanel({ request }: { request: Request }) {
   const queryClient = useQueryClient();
   const [reopening, setReopening] = useState(false);
   const [reason, setReason] = useState('');
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['loan', loan.id] });
-    await queryClient.invalidateQueries({ queryKey: ['loans'] });
+    await queryClient.invalidateQueries({ queryKey: ['request', request.id] });
+    await queryClient.invalidateQueries({ queryKey: ['requests'] });
   };
   const complete = useMutation({
-    mutationFn: () => apiFetch(`/api/loans/${loan.id}/complete`, { method: 'POST' }),
+    mutationFn: () => apiFetch(`/api/requests/${request.id}/complete`, { method: 'POST' }),
     onSuccess: refresh,
   });
   const reopen = useMutation({
-    mutationFn: (text: string) => apiFetch(`/api/loans/${loan.id}/reopen`, { method: 'POST', body: { reason: text } }),
+    mutationFn: (text: string) => apiFetch(`/api/requests/${request.id}/reopen`, { method: 'POST', body: { reason: text } }),
     onSuccess: async () => {
       setReopening(false);
       setReason('');
       await refresh();
     },
   });
-  const isCompleted = loan.status === 'Completed';
+  const isCompleted = request.status === 'Completed';
 
   const submitReopen = (event: FormEvent) => {
     event.preventDefault();
@@ -127,16 +127,16 @@ function CompletionPanel({ loan }: { loan: Loan }) {
   };
 
   return (
-    <section className="space-y-3" aria-label="Loan completion">
+    <section className="space-y-3" aria-label="Request completion">
       {isCompleted ? (
         <>
           <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
-            This loan is completed and locked. Items cannot be approved or rejected and invites cannot be sent or
+            This request is completed and locked. Items cannot be approved or rejected and invites cannot be sent or
             revoked until it is reopened.
           </p>
           {!reopening && (
             <button type="button" className={secondaryButtonClass} onClick={() => setReopening(true)}>
-              Reopen loan
+              Reopen request
             </button>
           )}
         </>
@@ -145,12 +145,12 @@ function CompletionPanel({ loan }: { loan: Loan }) {
           <button
             type="button"
             className={primaryButtonClass}
-            disabled={loan.status !== 'ReadyToComplete' || complete.isPending}
+            disabled={request.status !== 'ReadyToComplete' || complete.isPending}
             onClick={() => complete.mutate()}
           >
-            {complete.isPending ? 'Completing...' : 'Complete loan'}
+            {complete.isPending ? 'Completing...' : 'Complete request'}
           </button>
-          {loan.status !== 'ReadyToComplete' && (
+          {request.status !== 'ReadyToComplete' && (
             <p className="text-xs text-ink-muted">Available once every item is approved.</p>
           )}
         </div>
@@ -158,7 +158,7 @@ function CompletionPanel({ loan }: { loan: Loan }) {
       {reopening && (
         <form onSubmit={submitReopen} className="space-y-2">
           <label className="block text-sm font-medium text-ink">
-            Reason for reopening this loan
+            Reason for reopening this request
             <textarea
               className={inputClass}
               rows={3}
@@ -191,11 +191,11 @@ function CompletionPanel({ loan }: { loan: Loan }) {
   );
 }
 
-export function LoanDetailPage() {
+export function RequestDetailPage() {
   const { id } = useParams();
   const exportApproved = useMutation({
     mutationFn: async (reference: string) => {
-      const blob = await apiDownload(`/api/loans/${id}/export`);
+      const blob = await apiDownload(`/api/requests/${id}/export`);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -207,29 +207,29 @@ export function LoanDetailPage() {
     },
   });
   const { state } = useAuth();
-  const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, LOAN_WRITER_ROLES);
-  const loan = useQuery({ queryKey: ['loan', id], queryFn: () => apiFetch<Loan>(`/api/loans/${id}`) });
+  const canWrite = state.status === 'authenticated' && hasAnyRole(state.user, REQUEST_WRITER_ROLES);
+  const request = useQuery({ queryKey: ['request', id], queryFn: () => apiFetch<Request>(`/api/requests/${id}`) });
 
-  if (loan.isPending) return <p className="text-sm text-ink-muted">Loading loan...</p>;
-  if (loan.isError) {
+  if (request.isPending) return <p className="text-sm text-ink-muted">Loading request...</p>;
+  if (request.isError) {
     return (
       <ErrorList
         messages={
-          loan.error instanceof ApiError && loan.error.status === 404
-            ? ['This loan does not exist.']
-            : messagesOf(loan.error)
+          request.error instanceof ApiError && request.error.status === 404
+            ? ['This request does not exist.']
+            : messagesOf(request.error)
         }
       />
     );
   }
 
-  const data = loan.data;
+  const data = request.data;
   const locked = data.status === 'Completed';
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <Link to="/loans" className="text-sm text-brand-700 hover:underline">
-          Back to loans
+        <Link to="/requests" className="text-sm text-brand-700 hover:underline">
+          Back to requests
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-ink">
@@ -250,12 +250,12 @@ export function LoanDetailPage() {
           </div>
         </div>
         <p className="text-sm text-ink-muted">
-          {data.loanType} &middot; {formatAmount(data.amount)}
+          {data.requestType} &middot; {formatAmount(data.amount)}
         </p>
         <ErrorList messages={messagesOf(exportApproved.error)} />
       </div>
 
-      {canWrite && <CompletionPanel loan={data} />}
+      {canWrite && <CompletionPanel request={data} />}
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-ink">Parties</h2>
@@ -270,7 +270,7 @@ export function LoanDetailPage() {
         )}
       </section>
 
-      {canWrite && !locked && <SendInvitesPanel loanId={data.id} existingInvites={data.invites} />}
+      {canWrite && !locked && <SendInvitesPanel requestId={data.id} existingInvites={data.invites} />}
     </div>
   );
 }

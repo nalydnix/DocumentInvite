@@ -16,7 +16,7 @@ function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomeRedirect />} />
-          <Route path="loans" element={<h1>Loans page</h1>} />
+          <Route path="requests" element={<h1>Requests page</h1>} />
           <Route path="audit" element={<h1>Audit page</h1>} />
           <Route element={<ProtectedRoute roles={['Admin']} />}>
             <Route path="users" element={<h1>Users admin</h1>} />
@@ -27,7 +27,7 @@ function AppRoutes() {
   );
 }
 
-const loginRoutes = (roles: ('Admin' | 'LoanOfficer' | 'Auditor')[]) => ({
+const loginRoutes = (roles: ('Admin' | 'Requester' | 'Auditor')[]) => ({
   'POST /api/auth/login': () => jsonResponse(200, tokens),
   'GET /api/me': () => jsonResponse(200, meBody(roles, 'Dana Admin')),
 });
@@ -68,7 +68,7 @@ describe('sign-in and protected routes', () => {
   });
 
   it('blocks a signed-in user whose role does not allow the page', async () => {
-    mockApi(loginRoutes(['LoanOfficer']));
+    mockApi(loginRoutes(['Requester']));
 
     renderApp(<AppRoutes />, '/users');
     await signInThroughForm();
@@ -80,19 +80,19 @@ describe('sign-in and protected routes', () => {
     sessionStorage.setItem('di.refreshToken', 'refresh-1');
     mockApi({
       'POST /api/auth/refresh': () => jsonResponse(200, tokens),
-      'GET /api/me': () => jsonResponse(200, meBody(['LoanOfficer'], 'Lee Officer')),
+      'GET /api/me': () => jsonResponse(200, meBody(['Requester'], 'Lee Requester')),
     });
 
     renderApp(<AppRoutes />, '/');
 
-    expect(await screen.findByRole('heading', { name: 'Loans page' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Requests page' })).toBeInTheDocument();
   });
 
   it('signs out and returns to the sign-in page', async () => {
     mockApi(loginRoutes(['Admin']));
     renderApp(<AppRoutes />, '/');
     await signInThroughForm();
-    await screen.findByRole('heading', { name: 'Loans page' });
+    await screen.findByRole('heading', { name: 'Requests page' });
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[0]);
 
@@ -127,7 +127,7 @@ describe('role-aware navigation', () => {
     mockApi(loginRoutes(['Admin']));
     renderApp(<AppRoutes />, '/');
     await signInThroughForm();
-    await screen.findByRole('heading', { name: 'Loans page' });
+    await screen.findByRole('heading', { name: 'Requests page' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
 
@@ -137,15 +137,15 @@ describe('role-aware navigation', () => {
 });
 
 describe('landing route', () => {
-  it('redirects / to Loans for staff', async () => {
-    mockApi(loginRoutes(['LoanOfficer']));
+  it('redirects / to Requests for staff', async () => {
+    mockApi(loginRoutes(['Requester']));
     renderApp(<AppRoutes />, '/');
     await signInThroughForm();
 
-    expect(await screen.findByRole('heading', { name: 'Loans page' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Requests page' })).toBeInTheDocument();
   });
 
-  it('redirects / to the audit log for an auditor, who cannot open Loans', async () => {
+  it('redirects / to the audit log for an auditor, who cannot open Requests', async () => {
     mockApi(loginRoutes(['Auditor']));
     renderApp(<AppRoutes />, '/');
     await signInThroughForm();

@@ -1,4 +1,4 @@
-import { STATUS_LABELS, type CollectionStatus } from '../pages/loans';
+import { STATUS_LABELS, type CollectionStatus } from '../pages/requests';
 
 const STYLES: Record<CollectionStatus, string> = {
   Sent: 'bg-surface-muted text-ink-muted',

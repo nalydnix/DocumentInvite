@@ -128,3 +128,7 @@ az group delete --name <resource-group> --yes --no-wait
 ```
 
 This deletes every Azure resource in the group, including the database and uploaded documents. Remove the Vercel project and GitHub secrets separately.
+
+## Request rename migration and audit reset
+
+`RenameLoansToRequests` renames the loan tables in place and clears `dbo.AuditEvents` so the audit chain restarts from the genesis hash (see `CHANGELOG.md`). It needs the admin connection string, because the runtime user `di_app` is denied `DELETE` on the audit table. After deploy, run the audit integrity check (Admin, Audit page) to confirm the fresh chain verifies.

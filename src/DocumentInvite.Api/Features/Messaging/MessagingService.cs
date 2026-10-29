@@ -74,7 +74,7 @@ public sealed class MessagingService(
             return MessageResult<StaffMessageResponse>.Refused("The party's data has been erased, so they cannot be messaged.");
         }
 
-        var loan = await db.Loans.AsNoTracking().SingleAsync(l => l.Id == invite.LoanId, ct);
+        var request = await db.Requests.AsNoTracking().SingleAsync(l => l.Id == invite.RequestId, ct);
         var now = clock.GetUtcNow();
         var message = NewMessage(inviteId, MessageAuthorType.Team, body, isInternal: false, now);
         message.AuthorUserId = context.ActorId;
@@ -90,12 +90,12 @@ public sealed class MessagingService(
             invite.TokenExpiresAt = newExpiry;
         }
 
-        var content = EmailTemplates.NewMessage(new NewMessageEmailModel(contact.FirstName, loan.Name, links.For(token)));
+        var content = EmailTemplates.NewMessage(new NewMessageEmailModel(contact.FirstName, request.Name, links.For(token)));
 
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
-            await audit.RecordAsync("message.posted", new AuditTarget("invite", inviteId), Details(loan.Id, message.Id, MessageKind.Team), ct);
+            await audit.RecordAsync("message.posted", new AuditTarget("invite", inviteId), Details(request.Id, message.Id, MessageKind.Team), ct);
             var sent = await email.SendAsync(EmailMessage.From(contact.Email, content), ct);
             if (!sent.Delivered)
             {
@@ -116,8 +116,8 @@ public sealed class MessagingService(
     /// <summary>A note for the team only. Nothing is emailed and the party can never read it.</summary>
     public async Task<MessageResult<StaffMessageResponse>> PostInternalNoteAsync(Guid inviteId, string body, CancellationToken ct)
     {
-        var loanId = await db.Invites.AsNoTracking().Where(i => i.Id == inviteId).Select(i => (Guid?)i.LoanId).SingleOrDefaultAsync(ct);
-        if (loanId is null)
+        var requestId = await db.Invites.AsNoTracking().Where(i => i.Id == inviteId).Select(i => (Guid?)i.RequestId).SingleOrDefaultAsync(ct);
+        if (requestId is null)
         {
             return MessageResult<StaffMessageResponse>.Missing();
         }
@@ -127,7 +127,7 @@ public sealed class MessagingService(
         db.Messages.Add(message);
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await audit.RecordAsync("note.posted", new AuditTarget("invite", inviteId), Details(loanId.Value, message.Id, MessageKind.Internal), ct);
+        await audit.RecordAsync("note.posted", new AuditTarget("invite", inviteId), Details(requestId.Value, message.Id, MessageKind.Internal), ct);
         await transaction.CommitAsync(ct);
 
         return MessageResult<StaffMessageResponse>.Ok(await ToStaffAsync(message, ct));
@@ -151,7 +151,7 @@ public sealed class MessagingService(
         return PortalResult<PagedResponse<PortalMessageResponse>>.Ok(page);
     }
 
-    /// <summary>A reply from the party. The loan's creator is emailed a link to the loan page.</summary>
+    /// <summary>A reply from the party. The request's creator is emailed a link to the request page.</summary>
     public async Task<PortalResult<PortalMessageResponse>> PostPartyMessageAsync(Guid inviteId, string body, CancellationToken ct)
     {
         var invite = await db.Invites.AsNoTracking().SingleOrDefaultAsync(i => i.Id == inviteId, ct);
@@ -165,22 +165,22 @@ public sealed class MessagingService(
             return PortalResult<PortalMessageResponse>.Fail(PortalFailure.PrivacyRequired);
         }
 
-        var loan = await db.Loans.AsNoTracking().SingleAsync(l => l.Id == invite.LoanId, ct);
+        var request = await db.Requests.AsNoTracking().SingleAsync(l => l.Id == invite.RequestId, ct);
         var contact = await db.Contacts.AsNoTracking().SingleAsync(c => c.Id == invite.ContactId, ct);
         var message = NewMessage(inviteId, MessageAuthorType.Party, body, isInternal: false, clock.GetUtcNow());
         db.Messages.Add(message);
 
-        var recipient = loan.CreatedBy is { } creator
+        var recipient = request.CreatedBy is { } creator
             ? await db.Users.AsNoTracking().Where(u => u.Id == creator)
                 .Select(u => new { u.Email, u.DisplayName }).SingleOrDefaultAsync(ct)
             : null;
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await audit.RecordAsync("message.posted", new AuditTarget("invite", inviteId), Details(loan.Id, message.Id, MessageKind.Party), ct);
+        await audit.RecordAsync("message.posted", new AuditTarget("invite", inviteId), Details(request.Id, message.Id, MessageKind.Party), ct);
         if (!string.IsNullOrWhiteSpace(recipient?.Email))
         {
             var content = EmailTemplates.NewPartyMessage(new NewPartyMessageEmailModel(
-                recipient.DisplayName, loan.Name, $"{contact.FirstName} {contact.LastName}", links.ForLoan(loan.Id)));
+                recipient.DisplayName, request.Name, $"{contact.FirstName} {contact.LastName}", links.ForRequest(request.Id)));
             // A failed delivery is recorded on the stored email; it must not lose the party's message.
             await email.SendAsync(EmailMessage.From(recipient.Email, content), ct);
         }
@@ -201,8 +201,8 @@ public sealed class MessagingService(
         CreatedAt = now,
     };
 
-    private static AuditDetails Details(Guid loanId, Guid messageId, MessageKind kind) =>
-        AuditDetails.Empty.WithId("loanId", loanId).WithId("messageId", messageId).WithEnum("kind", kind);
+    private static AuditDetails Details(Guid requestId, Guid messageId, MessageKind kind) =>
+        AuditDetails.Empty.WithId("requestId", requestId).WithId("messageId", messageId).WithEnum("kind", kind);
 
     private async Task<Dictionary<Guid, string>> AuthorNamesAsync(IEnumerable<Message> messages, CancellationToken ct)
     {

@@ -28,7 +28,7 @@ export interface PortalItem {
 }
 
 export interface PortalInvite {
-  loanName: string;
+  requestName: string;
   partyFirstName: string;
   dueDate: string;
   status: string;

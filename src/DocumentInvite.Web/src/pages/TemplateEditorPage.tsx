@@ -192,7 +192,7 @@ function TemplateEditor({ template }: { template: TemplateDetail | null }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { state } = useAuth();
-  const canEdit = state.status === 'authenticated' && hasAnyRole(state.user, ['Admin', 'LoanOfficer']);
+  const canEdit = state.status === 'authenticated' && hasAnyRole(state.user, ['Admin', 'Requester']);
   const readOnly = !canEdit || (template?.isArchived ?? false);
 
   const [name, setName] = useState(template?.name ?? '');

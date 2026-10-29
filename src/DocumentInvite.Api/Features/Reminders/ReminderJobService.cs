@@ -171,7 +171,7 @@ public sealed class ReminderJobService(
         }
 
         var contact = await db.Contacts.AsNoTracking().SingleAsync(c => c.Id == invite.ContactId, ct);
-        var loanName = await db.Loans.AsNoTracking().Where(l => l.Id == invite.LoanId).Select(l => l.Name).SingleAsync(ct);
+        var requestName = await db.Requests.AsNoTracking().Where(l => l.Id == invite.RequestId).Select(l => l.Name).SingleAsync(ct);
 
         // Only the hash of a portal token is stored, so the previous link cannot be repeated in an
         // email. Each reminder therefore carries a freshly issued link, and the previous one stops
@@ -186,8 +186,8 @@ public sealed class ReminderJobService(
 
         var link = links.For(token);
         var content = action == ReminderAction.OverdueNotice
-            ? EmailTemplates.Overdue(new OverdueEmailModel(contact.FirstName, loanName, link, invite.DueDate, outstanding))
-            : EmailTemplates.Reminder(new ReminderEmailModel(contact.FirstName, loanName, link, invite.DueDate, outstanding));
+            ? EmailTemplates.Overdue(new OverdueEmailModel(contact.FirstName, requestName, link, invite.DueDate, outstanding))
+            : EmailTemplates.Reminder(new ReminderEmailModel(contact.FirstName, requestName, link, invite.DueDate, outstanding));
 
         try
         {

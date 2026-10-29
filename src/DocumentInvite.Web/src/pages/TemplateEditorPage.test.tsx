@@ -19,7 +19,7 @@ const template: TemplateDetail = {
   ],
 };
 
-function signedIn(role: 'Admin' | 'LoanOfficer' = 'LoanOfficer') {
+function signedIn(role: 'Admin' | 'Requester' = 'Requester') {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
   return {
     'POST /api/auth/refresh': () => jsonResponse(200, tokens),

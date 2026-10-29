@@ -164,9 +164,9 @@ function PrivacyNotice({ onAccepted }: { onAccepted: () => void }) {
         Before you start: privacy notice
       </h2>
       <p className="text-sm text-ink">
-        Your lender uses this page to collect the documents and information needed for your loan. What you upload
+        Your lender uses this page to collect the documents and information needed for your request. What you upload
         and enter is stored securely, is visible only to the lender&apos;s team, and is kept only as long as needed
-        for the loan. Each time you open this page or add something is recorded for security. You can ask your
+        for the request. Each time you open this page or add something is recorded for security. You can ask your
         lender to export or erase your data.
       </p>
       <label className="flex min-h-11 items-start gap-3 text-sm font-medium text-ink">
@@ -245,7 +245,7 @@ function Checklist({ onSessionEnded, upload }: { onSessionEnded: () => void; upl
         <div>
           <h1 className="break-words text-lg font-semibold text-ink">Hello {data.partyFirstName}</h1>
           <p className="break-words text-sm text-ink-muted">
-            {data.loanName} &middot; please finish by <strong className="text-ink">{formatDue(data.dueDate)}</strong>
+            {data.requestName} &middot; please finish by <strong className="text-ink">{formatDue(data.dueDate)}</strong>
           </p>
         </div>
         <ProgressBar done={data.completedItemCount} total={data.itemCount} />
@@ -264,7 +264,7 @@ function Checklist({ onSessionEnded, upload }: { onSessionEnded: () => void; upl
   );
 }
 
-/** The borrower portal at /p/{token}: no account, just the secure link (and an optional password). */
+/** The recipient portal at /p/{token}: no account, just the secure link (and an optional password). */
 export function PortalPage({ upload }: { upload?: UploadFunction } = {}) {
   useNoReferrer();
   const { token } = useParams();

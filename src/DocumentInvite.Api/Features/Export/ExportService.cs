@@ -15,40 +15,40 @@ public sealed record ExportFile(Guid FileId, string BlobName, string StoredFileN
 /// <summary>One party's approved content.</summary>
 public sealed record ExportParty(string FolderName, IReadOnlyList<ExportFile> Files, IReadOnlyList<(string Item, string Value)> Fields);
 
-/// <summary>Everything that goes into a loan's package. Built from small rows only; blobs are read while streaming.</summary>
-public sealed record ExportPlan(Guid LoanId, string LoanReference, IReadOnlyList<ExportParty> Parties)
+/// <summary>Everything that goes into a request's package. Built from small rows only; blobs are read while streaming.</summary>
+public sealed record ExportPlan(Guid RequestId, string RequestReference, IReadOnlyList<ExportParty> Parties)
 {
     public int FileCount => Parties.Sum(p => p.Files.Count);
     public bool IsEmpty => Parties.Count == 0;
 
     /// <summary>The download name, for example <c>LN-7-approved.zip</c>.</summary>
-    public string ArchiveName => $"{FileNaming.Sanitise(LoanReference)}-approved.zip";
+    public string ArchiveName => $"{FileNaming.Sanitise(RequestReference)}-approved.zip";
 }
 
-/// <summary>Builds the "Download approved" package: <c>{LoanRef}/{Party}/{file}</c> plus <c>fields.csv</c> per party.</summary>
+/// <summary>Builds the "Download approved" package: <c>{RequestRef}/{Party}/{file}</c> plus <c>fields.csv</c> per party.</summary>
 public sealed class ExportService(AppDbContext db, IBlobStore blobs, IAuditLog audit)
 {
     public const string FieldsFileName = "fields.csv";
 
-    /// <summary>Collects the approved content of a loan, or null when the loan does not exist.</summary>
-    public async Task<ExportPlan?> PlanAsync(Guid loanId, CancellationToken ct)
+    /// <summary>Collects the approved content of a request, or null when the request does not exist.</summary>
+    public async Task<ExportPlan?> PlanAsync(Guid requestId, CancellationToken ct)
     {
-        var loan = await db.Loans.AsNoTracking().SingleOrDefaultAsync(l => l.Id == loanId, ct);
-        if (loan is null)
+        var request = await db.Requests.AsNoTracking().SingleOrDefaultAsync(l => l.Id == requestId, ct);
+        if (request is null)
         {
             return null;
         }
 
         var rows = await (
             from invite in db.Invites.AsNoTracking()
-            where invite.LoanId == loanId
+            where invite.RequestId == requestId
             join contact in db.Contacts.AsNoTracking() on invite.ContactId equals contact.Id
             orderby invite.SentAt, invite.Id
             select new { InviteId = invite.Id, contact.FirstName, contact.LastName }).ToListAsync(ct);
 
         var items = await (
             from item in db.RequestItems.AsNoTracking()
-            where item.Status == RequestItemStatus.Approved && db.Invites.Any(i => i.Id == item.InviteId && i.LoanId == loanId)
+            where item.Status == RequestItemStatus.Approved && db.Invites.Any(i => i.Id == item.InviteId && i.RequestId == requestId)
             orderby item.SortOrder, item.Name, item.Id
             select item).ToListAsync(ct);
 
@@ -87,14 +87,14 @@ public sealed class ExportService(AppDbContext db, IBlobStore blobs, IAuditLog a
             parties.Add(new ExportParty(folder, partyFiles, fields));
         }
 
-        return new ExportPlan(loan.Id, loan.Reference, parties);
+        return new ExportPlan(request.Id, request.Reference, parties);
     }
 
     /// <summary>Records the export in the audit trail. Done before streaming so a failure still yields a clean error response.</summary>
     public Task AuditAsync(ExportPlan plan, CancellationToken ct) =>
         audit.RecordAsync(
-            "loan.exported",
-            new AuditTarget("loan", plan.LoanId),
+            "request.exported",
+            new AuditTarget("request", plan.RequestId),
             AuditDetails.Empty.WithCount("fileCount", plan.FileCount).WithCount("partyCount", plan.Parties.Count),
             ct);
 
@@ -104,7 +104,7 @@ public sealed class ExportService(AppDbContext db, IBlobStore blobs, IAuditLog a
     /// </summary>
     public async Task WriteZipAsync(ExportPlan plan, Stream output, CancellationToken ct)
     {
-        var root = FileNaming.Sanitise(plan.LoanReference);
+        var root = FileNaming.Sanitise(plan.RequestReference);
         using var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true);
         foreach (var party in plan.Parties)
         {

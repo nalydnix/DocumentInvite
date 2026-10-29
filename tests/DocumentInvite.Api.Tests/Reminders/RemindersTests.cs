@@ -7,7 +7,7 @@ using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Contacts;
 using DocumentInvite.Api.Features.Invites;
-using DocumentInvite.Api.Features.Loans;
+using DocumentInvite.Api.Features.Requests;
 using DocumentInvite.Api.Features.Outbox;
 using DocumentInvite.Api.Features.Reminders;
 using DocumentInvite.Api.Infrastructure.Persistence;
@@ -144,24 +144,24 @@ public partial class RemindersTests : StaffTestBase
         return (await response.Content.ReadFromJsonAsync<ReminderRunResponse>())!;
     }
 
-    private async Task<(HttpClient Officer, Guid InviteId, Guid LoanId)> SendInviteAsync(
+    private async Task<(HttpClient Requester, Guid InviteId, Guid RequestId)> SendInviteAsync(
         string reference = "LN-2001", string email = "ann@example.com", int interval = 3, int dueInDays = 10)
     {
-        var officer = await ClientForAsync($"lo-{reference}@example.com", [StaffRoles.LoanOfficer]);
-        var contact = await (await officer.PostAsJsonAsync("/api/contacts",
+        var requester = await ClientForAsync($"lo-{reference}@example.com", [StaffRoles.Requester]);
+        var contact = await (await requester.PostAsJsonAsync("/api/contacts",
             new ContactRequest("Ann", "Lee", email, null, PartyType.Borrower))).Content.ReadFromJsonAsync<ContactResponse>();
-        var loan = await (await officer.PostAsJsonAsync("/api/loans",
-            new LoanRequest(reference, "Acme acquisition", 1_000_000m, "SBA 7(a)"))).Content.ReadFromJsonAsync<LoanResponse>();
+        var request = await (await requester.PostAsJsonAsync("/api/requests",
+            new SaveRequestRequest(reference, "Acme acquisition", 1_000_000m, "SBA 7(a)"))).Content.ReadFromJsonAsync<RequestResponse>();
         var items = new[]
         {
             new InviteItemRequest("Tax return", ItemKind.FileUpload, "", false, null, true),
             new InviteItemRequest("Bank statement", ItemKind.FileUpload, "", false, null, true),
         };
-        var response = await officer.PostAsJsonAsync($"/api/loans/{loan!.Id}/invites",
+        var response = await requester.PostAsJsonAsync($"/api/requests/{request!.Id}/invites",
             new SendInvitesRequest([new SendPartyRequest(contact!.Id, Today.AddDays(dueInDays), interval, items)]));
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         var invites = await response.Content.ReadFromJsonAsync<List<InviteResponse>>();
-        return (officer, invites![0].Id, loan.Id);
+        return (requester, invites![0].Id, request.Id);
     }
 
     private async Task<List<OutboxEmail>> EmailsAsync()
@@ -227,7 +227,7 @@ public partial class RemindersTests : StaffTestBase
     public async Task Run_now_is_for_admins_only()
     {
         (await NewClient().PostAsync("/api/jobs/reminders/run", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        foreach (var role in new[] { StaffRoles.LoanOfficer, StaffRoles.Auditor })
+        foreach (var role in new[] { StaffRoles.Requester, StaffRoles.Auditor })
         {
             var client = await ClientForAsync($"{role}@example.com", [role]);
             (await client.PostAsync("/api/jobs/reminders/run", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -343,8 +343,8 @@ public partial class RemindersTests : StaffTestBase
     [Fact]
     public async Task A_revoked_invite_is_not_reminded()
     {
-        var (officer, inviteId, _) = await SendInviteAsync(interval: 3);
-        (await officer.PostAsync($"/api/invites/{inviteId}/revoke", null)).EnsureSuccessStatusCode();
+        var (requester, inviteId, _) = await SendInviteAsync(interval: 3);
+        (await requester.PostAsync($"/api/invites/{inviteId}/revoke", null)).EnsureSuccessStatusCode();
         _clock.Now = _clock.Now.AddDays(5);
 
         (await RunScheduledAsync()).InvitesDue.Should().Be(0);

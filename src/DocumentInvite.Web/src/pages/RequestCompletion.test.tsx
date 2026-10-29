@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import type { Role } from '../auth/AuthContext';
 import { jsonResponse, mockApi, meBody, renderApp, resetSession, tokens } from '../test-utils';
-import { LoanDetailPage } from './LoanDetailPage';
-import type { CollectionStatus, InviteItem, Loan, RequestItemStatus } from './loans';
+import { RequestDetailPage } from './RequestDetailPage';
+import type { CollectionStatus, InviteItem, Request, RequestItemStatus } from './requests';
 
 afterEach(resetSession);
 
@@ -27,20 +27,20 @@ function item(status: RequestItemStatus): InviteItem {
   };
 }
 
-function loan(status: CollectionStatus, itemStatus: RequestItemStatus): Loan {
+function request(status: CollectionStatus, itemStatus: RequestItemStatus): Request {
   return {
     id: 'l1',
     reference: 'LN-1',
     name: 'Acme',
     amount: 10,
-    loanType: 'SBA',
+    requestType: 'SBA',
     status,
     createdAt: '2027-01-05T10:00:00Z',
     completedAt: status === 'Completed' ? '2027-01-09T10:00:00Z' : null,
     invites: [
       {
         id: 'i1',
-        loanId: 'l1',
+        requestId: 'l1',
         contactId: 'c1',
         partyName: 'Ann Lee',
         partyEmail: 'ann@example.com',
@@ -58,108 +58,108 @@ function loan(status: CollectionStatus, itemStatus: RequestItemStatus): Loan {
   };
 }
 
-function setup(roles: Role[], data: Loan, extra: Record<string, () => Response> = {}) {
+function setup(roles: Role[], data: Request, extra: Record<string, () => Response> = {}) {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
   const mock = mockApi({
     'POST /api/auth/refresh': () => jsonResponse(200, tokens),
     'GET /api/me': () => jsonResponse(200, meBody(roles)),
-    'GET /api/loans/l1': () => jsonResponse(200, data),
+    'GET /api/requests/l1': () => jsonResponse(200, data),
     'GET /api/contacts?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
     'GET /api/templates?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
-    'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 25 }),
+    'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 25 }),
     ...extra,
   });
   renderApp(
     <Routes>
-      <Route path="/loans/:id" element={<LoanDetailPage />} />
+      <Route path="/requests/:id" element={<RequestDetailPage />} />
     </Routes>,
-    '/loans/l1',
+    '/requests/l1',
   );
   return mock;
 }
 
-describe('loan completion', () => {
-  it('shows the Ready to complete badge and enables Complete loan', async () => {
-    const { calls } = setup(['LoanOfficer'], loan('ReadyToComplete', 'Approved'), {
-      'POST /api/loans/l1/complete': () => jsonResponse(200, {}),
+describe('request completion', () => {
+  it('shows the Ready to complete badge and enables Complete request', async () => {
+    const { calls } = setup(['Requester'], request('ReadyToComplete', 'Approved'), {
+      'POST /api/requests/l1/complete': () => jsonResponse(200, {}),
     });
     const user = userEvent.setup();
 
-    const button = await screen.findByRole('button', { name: 'Complete loan' });
+    const button = await screen.findByRole('button', { name: 'Complete request' });
     expect(screen.getAllByText('Ready to complete').length).toBeGreaterThan(0);
     expect(button).toBeEnabled();
 
     await user.click(button);
-    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/loans/l1/complete')).toBe(true));
+    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/requests/l1/complete')).toBe(true));
   });
 
-  it('disables Complete loan until everything is approved', async () => {
-    setup(['LoanOfficer'], loan('Submitted', 'Submitted'));
+  it('disables Complete request until everything is approved', async () => {
+    setup(['Requester'], request('Submitted', 'Submitted'));
 
-    expect(await screen.findByRole('button', { name: 'Complete loan' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Complete request' })).toBeDisabled();
   });
 
   it('shows a refused completion to the user', async () => {
-    setup(['LoanOfficer'], loan('ReadyToComplete', 'Approved'), {
-      'POST /api/loans/l1/complete': () =>
+    setup(['Requester'], request('ReadyToComplete', 'Approved'), {
+      'POST /api/requests/l1/complete': () =>
         jsonResponse(409, { title: 'Conflict', detail: 'Not everything is approved.' }),
     });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Complete loan' }));
+    await user.click(await screen.findByRole('button', { name: 'Complete request' }));
 
     expect(await screen.findByText('Not everything is approved.')).toBeInTheDocument();
   });
 
-  it('locks a Completed loan and explains why', async () => {
-    setup(['LoanOfficer'], loan('Completed', 'Approved'));
+  it('locks a Completed request and explains why', async () => {
+    setup(['Requester'], request('Completed', 'Approved'));
 
     expect(await screen.findByText(/completed and locked/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject Bank statement' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Complete loan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Complete request' })).not.toBeInTheDocument();
   });
 
-  it('disables approve on a Completed loan', async () => {
-    setup(['LoanOfficer'], loan('Completed', 'Submitted'));
+  it('disables approve on a Completed request', async () => {
+    setup(['Requester'], request('Completed', 'Submitted'));
 
     expect(await screen.findByRole('button', { name: 'Approve Bank statement' })).toBeDisabled();
   });
 
   it('asks for a reason before reopening', async () => {
-    const { calls } = setup(['LoanOfficer'], loan('Completed', 'Approved'), {
-      'POST /api/loans/l1/reopen': () => jsonResponse(200, {}),
+    const { calls } = setup(['Requester'], request('Completed', 'Approved'), {
+      'POST /api/requests/l1/reopen': () => jsonResponse(200, {}),
     });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Reopen loan' }));
+    await user.click(await screen.findByRole('button', { name: 'Reopen request' }));
     const send = screen.getByRole('button', { name: 'Reopen' });
     expect(send).toBeDisabled();
 
     await user.type(screen.getByLabelText(/Reason for reopening/), ' Missing page ');
     await user.click(send);
 
-    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/loans/l1/reopen')).toBe(true));
-    const call = calls.find((c) => c.key === 'POST /api/loans/l1/reopen');
+    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/requests/l1/reopen')).toBe(true));
+    const call = calls.find((c) => c.key === 'POST /api/requests/l1/reopen');
     expect(JSON.parse(String(call?.init?.body))).toEqual({ reason: 'Missing page' });
   });
 
   it('shows a refused reopen to the user', async () => {
-    setup(['LoanOfficer'], loan('Completed', 'Approved'), {
-      'POST /api/loans/l1/reopen': () => jsonResponse(409, { title: 'Conflict', detail: 'Loan is not completed.' }),
+    setup(['Requester'], request('Completed', 'Approved'), {
+      'POST /api/requests/l1/reopen': () => jsonResponse(409, { title: 'Conflict', detail: 'Request is not completed.' }),
     });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Reopen loan' }));
+    await user.click(await screen.findByRole('button', { name: 'Reopen request' }));
     await user.type(screen.getByLabelText(/Reason for reopening/), 'Because');
     await user.click(screen.getByRole('button', { name: 'Reopen' }));
 
-    expect(await screen.findByText('Loan is not completed.')).toBeInTheDocument();
+    expect(await screen.findByText('Request is not completed.')).toBeInTheDocument();
   });
 
   it('hides the completion actions from read-only roles', async () => {
-    setup(['Auditor'], loan('ReadyToComplete', 'Approved'));
+    setup(['Auditor'], request('ReadyToComplete', 'Approved'));
 
     await screen.findByText('Ann Lee');
-    expect(screen.queryByRole('button', { name: 'Complete loan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Complete request' })).not.toBeInTheDocument();
   });
 });

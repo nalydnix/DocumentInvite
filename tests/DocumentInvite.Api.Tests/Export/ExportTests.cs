@@ -25,15 +25,15 @@ public class ExportTests : StaffTestBase
         services.AddSingleton<IBlobStore>(_blobs);
     }
 
-    private async Task<Guid> SeedLoanAsync(bool approveAnything = true)
+    private async Task<Guid> SeedRequestAsync(bool approveAnything = true)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var loan = new Loan { Reference = "LN-7", Name = "Acme", LoanType = "SBA", Amount = 5, CreatedAt = DateTimeOffset.UtcNow };
+        var request = new Request { Reference = "LN-7", Name = "Acme", RequestType = "SBA", Amount = 5, CreatedAt = DateTimeOffset.UtcNow };
 
         Invite NewInvite(Contact contact, params RequestItem[] items) => new()
         {
-            LoanId = loan.Id, ContactId = contact.Id, TokenHash = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32), TokenExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
+            RequestId = request.Id, ContactId = contact.Id, TokenHash = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32), TokenExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
             DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)), SentAt = DateTimeOffset.UtcNow, Items = [.. items],
         };
 
@@ -53,8 +53,8 @@ public class ExportTests : StaffTestBase
         var lease = FileItem("Lease", RequestItemStatus.Approved);
         var annInvite = NewInvite(ann, statements, taxes, years, notes, pending);
         var bobInvite = NewInvite(bob, lease);
-        loan.Invites.Add(annInvite);
-        loan.Invites.Add(bobInvite);
+        request.Invites.Add(annInvite);
+        request.Invites.Add(bobInvite);
 
         StoredFile Stored(Invite invite, RequestItem item, string name, int seq, StoredFileStatus status = StoredFileStatus.Ready)
         {
@@ -68,7 +68,7 @@ public class ExportTests : StaffTestBase
         }
 
         db.Contacts.AddRange(ann, bob);
-        db.Loans.Add(loan);
+        db.Requests.Add(request);
         db.StoredFiles.AddRange(
             Stored(annInvite, statements, "LN-7_Lee_Bank-statements_1.pdf", 1),
             Stored(annInvite, statements, "LN-7_Lee_Bank-statements_2.pdf", 2),
@@ -76,7 +76,7 @@ public class ExportTests : StaffTestBase
             Stored(annInvite, taxes, "LN-7_Lee_Tax-return_1.pdf", 1),
             Stored(bobInvite, lease, "LN-7_Adams_Lease_1.pdf", 1));
         await db.SaveChangesAsync();
-        return loan.Id;
+        return request.Id;
     }
 
     private async Task<HttpClient> ClientAsync(string role) => await ClientForAsync($"{role}@example.com", [role]);
@@ -98,12 +98,12 @@ public class ExportTests : StaffTestBase
     }
 
     [Fact]
-    public async Task Export_produces_loan_party_folders_with_canonical_names_and_fields_csv()
+    public async Task Export_produces_request_party_folders_with_canonical_names_and_fields_csv()
     {
-        var loanId = await SeedLoanAsync();
-        var officer = await ClientAsync(StaffRoles.LoanOfficer);
+        var requestId = await SeedRequestAsync();
+        var requester = await ClientAsync(StaffRoles.Requester);
 
-        var response = await officer.GetAsync($"/api/loans/{loanId}/export");
+        var response = await requester.GetAsync($"/api/requests/{requestId}/export");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/zip");
@@ -129,37 +129,37 @@ public class ExportTests : StaffTestBase
     [Fact]
     public async Task Export_is_allowed_for_admins_and_audited_with_counts_only()
     {
-        var loanId = await SeedLoanAsync();
+        var requestId = await SeedRequestAsync();
         var admin = await ClientAsync(StaffRoles.Admin);
 
-        (await admin.GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.GetAsync($"/api/requests/{requestId}/export")).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var audit = (await AuditEventsAsync()).Single(e => e.Action == "loan.exported");
-        audit.TargetType.Should().Be("loan");
-        audit.TargetId.Should().Be(loanId);
+        var audit = (await AuditEventsAsync()).Single(e => e.Action == "request.exported");
+        audit.TargetType.Should().Be("request");
+        audit.TargetId.Should().Be(requestId);
         audit.DetailsJson.Should().Contain("\"fileCount\":3").And.Contain("\"partyCount\":2").And.NotContain("Lee");
     }
 
     [Fact]
     public async Task Export_is_refused_for_auditors_and_anonymous_callers_without_auditing()
     {
-        var loanId = await SeedLoanAsync();
+        var requestId = await SeedRequestAsync();
         var auditor = await ClientAsync(StaffRoles.Auditor);
 
-        (await auditor.GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await NewClient().GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await AuditEventsAsync()).Should().NotContain(e => e.Action == "loan.exported");
+        (await auditor.GetAsync($"/api/requests/{requestId}/export")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await NewClient().GetAsync($"/api/requests/{requestId}/export")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await AuditEventsAsync()).Should().NotContain(e => e.Action == "request.exported");
     }
 
     [Fact]
-    public async Task Export_of_a_loan_with_nothing_approved_is_a_conflict_and_unknown_loans_are_404()
+    public async Task Export_of_a_request_with_nothing_approved_is_a_conflict_and_unknown_requests_are_404()
     {
-        var loanId = await SeedLoanAsync(approveAnything: false);
-        var officer = await ClientAsync(StaffRoles.LoanOfficer);
+        var requestId = await SeedRequestAsync(approveAnything: false);
+        var requester = await ClientAsync(StaffRoles.Requester);
 
-        (await officer.GetAsync($"/api/loans/{loanId}/export")).StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await officer.GetAsync($"/api/loans/{Guid.NewGuid()}/export")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await AuditEventsAsync()).Should().NotContain(e => e.Action == "loan.exported");
+        (await requester.GetAsync($"/api/requests/{requestId}/export")).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await requester.GetAsync($"/api/requests/{Guid.NewGuid()}/export")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await AuditEventsAsync()).Should().NotContain(e => e.Action == "request.exported");
     }
 
     [Theory]

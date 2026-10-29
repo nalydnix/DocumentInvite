@@ -67,7 +67,7 @@ function TemplateRow({ template, canEdit }: { template: TemplateSummary; canEdit
 
 export function TemplatesPage() {
   const { state } = useAuth();
-  const canEdit = state.status === 'authenticated' && hasAnyRole(state.user, ['Admin', 'LoanOfficer']);
+  const canEdit = state.status === 'authenticated' && hasAnyRole(state.user, ['Admin', 'Requester']);
   const paging = usePaging();
   const templates = useQuery({
     queryKey: ['templates', 'list', paging.page, paging.pageSize],

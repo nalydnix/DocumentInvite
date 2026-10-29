@@ -61,8 +61,8 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("a1000000-0000-0000-0000-000000000002"),
                             ConcurrencyStamp = "a1000000-0000-0000-0000-000000000002",
-                            Name = "LoanOfficer",
-                            NormalizedName = "LOANOFFICER"
+                            Name = "Requester",
+                            NormalizedName = "REQUESTER"
                         },
                         new
                         {
@@ -313,9 +313,6 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LastReminderAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<Guid>("LoanId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTimeOffset?>("OverdueNoticeSentAt")
                         .HasColumnType("datetimeoffset");
 
@@ -331,6 +328,9 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("ReminderIntervalDays")
                         .HasColumnType("int");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("datetimeoffset");
@@ -363,7 +363,7 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("TokenHash")
                         .IsUnique();
 
-                    b.HasIndex("LoanId", "ContactId")
+                    b.HasIndex("RequestId", "ContactId")
                         .IsUnique();
 
                     b.ToTable("Invites", (string)null);
@@ -402,61 +402,6 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("JobRuns", (string)null);
-                });
-
-            modelBuilder.Entity("DocumentInvite.Api.Domain.Loan", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("LoanType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Reference")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Reference")
-                        .IsUnique();
-
-                    b.HasIndex("CreatedAt", "Id");
-
-                    b.ToTable("Loans", (string)null);
                 });
 
             modelBuilder.Entity("DocumentInvite.Api.Domain.Message", b =>
@@ -557,6 +502,61 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("OutboxEmailReads", (string)null);
+                });
+
+            modelBuilder.Entity("DocumentInvite.Api.Domain.Request", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("RequestType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedAt", "Id");
+
+                    b.ToTable("Requests", (string)null);
                 });
 
             modelBuilder.Entity("DocumentInvite.Api.Domain.RequestItem", b =>
@@ -880,9 +880,9 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("DocumentInvite.Api.Domain.Loan", null)
+                    b.HasOne("DocumentInvite.Api.Domain.Request", null)
                         .WithMany("Invites")
-                        .HasForeignKey("LoanId")
+                        .HasForeignKey("RequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -994,7 +994,7 @@ namespace DocumentInvite.Api.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("DocumentInvite.Api.Domain.Loan", b =>
+            modelBuilder.Entity("DocumentInvite.Api.Domain.Request", b =>
                 {
                     b.Navigation("Invites");
                 });

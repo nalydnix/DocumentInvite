@@ -30,7 +30,7 @@ public class RetentionTests : StaffTestBase
         services.AddSingleton<IBlobStore>(_blobs);
     }
 
-    private sealed record SeededLoan(Guid LoanId, Guid ContactId, string BlobName);
+    private sealed record SeededRequest(Guid RequestId, Guid ContactId, string BlobName);
 
     private async Task SetRetentionAsync(int days)
     {
@@ -39,8 +39,8 @@ public class RetentionTests : StaffTestBase
         await db.Settings.ExecuteUpdateAsync(s => s.SetProperty(x => x.RetentionDaysAfterCompletion, days));
     }
 
-    /// <summary>Adds a contact (unless one is given) with an invite, an item and one file on a new loan.</summary>
-    private async Task<SeededLoan> SeedLoanAsync(string reference, DateTimeOffset? completedAt, Guid? contactId = null)
+    /// <summary>Adds a contact (unless one is given) with an invite, an item and one file on a new request.</summary>
+    private async Task<SeededRequest> SeedRequestAsync(string reference, DateTimeOffset? completedAt, Guid? contactId = null)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -55,9 +55,9 @@ public class RetentionTests : StaffTestBase
             contactId = contact.Id;
         }
 
-        var loan = new Loan
+        var request = new Request
         {
-            Reference = reference, Name = "Acme loan", LoanType = "SBA", Amount = 5,
+            Reference = reference, Name = "Acme request", RequestType = "SBA", Amount = 5,
             CreatedAt = DateTimeOffset.UtcNow, CompletedAt = completedAt,
             Status = completedAt is null ? CollectionStatus.InProgress : CollectionStatus.Completed,
         };
@@ -68,12 +68,12 @@ public class RetentionTests : StaffTestBase
         };
         var invite = new Invite
         {
-            LoanId = loan.Id, ContactId = contactId.Value, TokenHash = Guid.NewGuid().ToByteArray(),
+            RequestId = request.Id, ContactId = contactId.Value, TokenHash = Guid.NewGuid().ToByteArray(),
             TokenExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
             DueDate = DateOnly.FromDateTime(DateTime.UtcNow), SentAt = DateTimeOffset.UtcNow, Items = [item],
         };
-        loan.Invites.Add(invite);
-        db.Loans.Add(loan);
+        request.Invites.Add(invite);
+        db.Requests.Add(request);
         var blobName = $"invites/{invite.Id}/{Guid.NewGuid()}";
         _blobs.Put(blobName, "%PDF-1.4"u8.ToArray(), "application/pdf");
         db.StoredFiles.Add(new StoredFile
@@ -83,7 +83,7 @@ public class RetentionTests : StaffTestBase
         });
         db.Messages.Add(new Message { InviteId = invite.Id, AuthorType = MessageAuthorType.Party, Body = "hi", CreatedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
-        return new SeededLoan(loan.Id, contactId.Value, blobName);
+        return new SeededRequest(request.Id, contactId.Value, blobName);
     }
 
     private async Task<T> DbAsync<T>(Func<AppDbContext, Task<T>> query)
@@ -103,19 +103,19 @@ public class RetentionTests : StaffTestBase
     [Fact]
     public async Task The_endpoints_are_admin_only()
     {
-        var officer = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
-        (await officer.GetAsync(Preview)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await officer.PostAsync(Run, null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var requester = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
+        (await requester.GetAsync(Preview)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await requester.PostAsync(Run, null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await NewClient().GetAsync(Preview)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task Preview_lists_the_loans_and_file_counts_and_changes_nothing()
+    public async Task Preview_lists_the_requests_and_file_counts_and_changes_nothing()
     {
         await SetRetentionAsync(30);
-        var old = await SeedLoanAsync("OLD-1", DaysAgo(40));
-        await SeedLoanAsync("NEW-1", DaysAgo(5));
-        await SeedLoanAsync("OPEN-1", null);
+        var old = await SeedRequestAsync("OLD-1", DaysAgo(40));
+        await SeedRequestAsync("NEW-1", DaysAgo(5));
+        await SeedRequestAsync("OPEN-1", null);
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
 
         var response = await admin.GetAsync(Preview);
@@ -123,13 +123,13 @@ public class RetentionTests : StaffTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = (await response.Content.ReadFromJsonAsync<RetentionPreviewResponse>())!;
         body.RetentionDays.Should().Be(30);
-        body.LoanCount.Should().Be(1);
+        body.RequestCount.Should().Be(1);
         body.FileCount.Should().Be(1);
         body.ContactCount.Should().Be(1);
-        body.Loans.Items.Should().ContainSingle().Which.Should().Match<RetentionLoan>(
-            l => l.Id == old.LoanId && l.Reference == "OLD-1" && l.FileCount == 1);
+        body.Requests.Items.Should().ContainSingle().Which.Should().Match<RetentionRequest>(
+            l => l.Id == old.RequestId && l.Reference == "OLD-1" && l.FileCount == 1);
 
-        (await DbAsync(db => db.Loans.CountAsync())).Should().Be(3);
+        (await DbAsync(db => db.Requests.CountAsync())).Should().Be(3);
         _blobs.Exists(old.BlobName).Should().BeTrue();
         (await DbAsync(db => db.Contacts.CountAsync(c => c.IsPseudonymised))).Should().Be(0);
     }
@@ -140,34 +140,34 @@ public class RetentionTests : StaffTestBase
         await SetRetentionAsync(30);
         for (var i = 1; i <= 3; i++)
         {
-            await SeedLoanAsync($"OLD-{i}", DaysAgo(40 + i));
+            await SeedRequestAsync($"OLD-{i}", DaysAgo(40 + i));
         }
 
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
         var body = (await admin.GetFromJsonAsync<RetentionPreviewResponse>($"{Preview}?page=2&pageSize=2"))!;
 
-        body.LoanCount.Should().Be(3);
-        body.Loans.Total.Should().Be(3);
-        body.Loans.Items.Should().ContainSingle();
+        body.RequestCount.Should().Be(3);
+        body.Requests.Total.Should().Be(3);
+        body.Requests.Items.Should().ContainSingle();
         (await admin.GetAsync($"{Preview}?page=0")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
-    public async Task Run_deletes_expired_loans_files_and_pseudonymises_contacts_without_loans()
+    public async Task Run_deletes_expired_requests_files_and_pseudonymises_contacts_without_requests()
     {
         await SetRetentionAsync(30);
-        var old = await SeedLoanAsync("OLD-1", DaysAgo(40));
-        var recent = await SeedLoanAsync("NEW-1", DaysAgo(5));
-        var open = await SeedLoanAsync("OPEN-1", null);
+        var old = await SeedRequestAsync("OLD-1", DaysAgo(40));
+        var recent = await SeedRequestAsync("NEW-1", DaysAgo(5));
+        var open = await SeedRequestAsync("OPEN-1", null);
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
 
         var response = await admin.PostAsync(Run, null);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = (await response.Content.ReadFromJsonAsync<RetentionRunResponse>())!;
-        (body.LoansDeleted, body.FilesDeleted, body.ContactsPseudonymised).Should().Be((1, 1, 1));
+        (body.RequestsDeleted, body.FilesDeleted, body.ContactsPseudonymised).Should().Be((1, 1, 1));
 
-        (await DbAsync(db => db.Loans.Select(l => l.Reference).OrderBy(r => r).ToListAsync()))
+        (await DbAsync(db => db.Requests.Select(l => l.Reference).OrderBy(r => r).ToListAsync()))
             .Should().Equal("NEW-1", "OPEN-1");
         (await DbAsync(db => db.Invites.CountAsync())).Should().Be(2);
         (await DbAsync(db => db.StoredFiles.CountAsync())).Should().Be(2);
@@ -186,26 +186,26 @@ public class RetentionTests : StaffTestBase
     }
 
     [Fact]
-    public async Task A_contact_with_another_loan_that_stays_is_not_pseudonymised()
+    public async Task A_contact_with_another_request_that_stays_is_not_pseudonymised()
     {
         await SetRetentionAsync(30);
-        var old = await SeedLoanAsync("OLD-1", DaysAgo(40));
-        await SeedLoanAsync("NEW-1", DaysAgo(5), old.ContactId);
+        var old = await SeedRequestAsync("OLD-1", DaysAgo(40));
+        await SeedRequestAsync("NEW-1", DaysAgo(5), old.ContactId);
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
 
         var body = (await (await admin.PostAsync(Run, null)).Content.ReadFromJsonAsync<RetentionRunResponse>())!;
 
-        body.LoansDeleted.Should().Be(1);
+        body.RequestsDeleted.Should().Be(1);
         body.ContactsPseudonymised.Should().Be(0);
         (await DbAsync(db => db.Contacts.AsNoTracking().SingleAsync(c => c.Id == old.ContactId)))
             .IsPseudonymised.Should().BeFalse();
     }
 
     [Fact]
-    public async Task Contacts_that_never_joined_a_loan_are_left_alone()
+    public async Task Contacts_that_never_joined_a_request_are_left_alone()
     {
         await SetRetentionAsync(30);
-        await SeedLoanAsync("OLD-1", DaysAgo(40));
+        await SeedRequestAsync("OLD-1", DaysAgo(40));
         var lone = new Contact
         {
             FirstName = "Lone", LastName = "Wolf", Email = "lone@example.com", PartyType = PartyType.Broker,
@@ -227,25 +227,25 @@ public class RetentionTests : StaffTestBase
     public async Task Running_again_changes_nothing_further()
     {
         await SetRetentionAsync(30);
-        await SeedLoanAsync("OLD-1", DaysAgo(40));
+        await SeedRequestAsync("OLD-1", DaysAgo(40));
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
         (await admin.PostAsync(Run, null)).EnsureSuccessStatusCode();
         var contactsBefore = await DbAsync(db => db.Contacts.AsNoTracking().ToListAsync());
 
         var again = (await (await admin.PostAsync(Run, null)).Content.ReadFromJsonAsync<RetentionRunResponse>())!;
 
-        (again.LoansDeleted, again.FilesDeleted, again.ContactsPseudonymised).Should().Be((0, 0, 0));
+        (again.RequestsDeleted, again.FilesDeleted, again.ContactsPseudonymised).Should().Be((0, 0, 0));
         var contactsAfter = await DbAsync(db => db.Contacts.AsNoTracking().ToListAsync());
         contactsAfter.Should().BeEquivalentTo(contactsBefore);
         var preview = (await admin.GetFromJsonAsync<RetentionPreviewResponse>(Preview))!;
-        preview.LoanCount.Should().Be(0);
+        preview.RequestCount.Should().Be(0);
     }
 
     [Fact]
     public async Task Previews_and_runs_are_audited_with_ids_and_counts_only_and_the_chain_still_verifies()
     {
         await SetRetentionAsync(30);
-        var old = await SeedLoanAsync("OLD-1", DaysAgo(40));
+        var old = await SeedRequestAsync("OLD-1", DaysAgo(40));
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
 
         (await admin.GetAsync(Preview)).EnsureSuccessStatusCode();
@@ -254,10 +254,10 @@ public class RetentionTests : StaffTestBase
 
         var events = await AuditEventsAsync();
         var previewed = events.Single(e => e.Action == "retention.previewed");
-        previewed.DetailsJson.Should().Be("{\"contacts\":1,\"files\":1,\"loans\":1}");
+        previewed.DetailsJson.Should().Be("{\"contacts\":1,\"files\":1,\"requests\":1}");
         events.Where(e => e.Action == "retention.run").Select(e => e.DetailsJson).Should().Equal(
-            "{\"contacts\":1,\"files\":1,\"loans\":1}", "{\"contacts\":0,\"files\":0,\"loans\":0}");
-        events.Single(e => e.Action == "loan.purged").TargetId.Should().Be(old.LoanId);
+            "{\"contacts\":1,\"files\":1,\"requests\":1}", "{\"contacts\":0,\"files\":0,\"requests\":0}");
+        events.Single(e => e.Action == "request.purged").TargetId.Should().Be(old.RequestId);
         events.Single(e => e.Action == "contact.pseudonymised").TargetId.Should().Be(old.ContactId);
         events.Select(e => e.DetailsJson).Should().NotContainMatch("*Pat*").And.NotContainMatch("*OLD-1*");
 
@@ -270,14 +270,14 @@ public class RetentionTests : StaffTestBase
     public async Task Nothing_is_recorded_as_purged_when_a_blob_cannot_be_deleted()
     {
         await SetRetentionAsync(30);
-        var old = await SeedLoanAsync("OLD-1", DaysAgo(40));
+        var old = await SeedRequestAsync("OLD-1", DaysAgo(40));
         _blobs.FailDeletes = true;
         var admin = await ClientForAsync("admin@example.com", [StaffRoles.Admin]);
 
         var response = await admin.PostAsync(Run, null);
 
         response.IsSuccessStatusCode.Should().BeFalse();
-        (await DbAsync(db => db.Loans.CountAsync(l => l.Id == old.LoanId))).Should().Be(1);
-        (await AuditEventsAsync()).Should().NotContain(e => e.Action == "loan.purged");
+        (await DbAsync(db => db.Requests.CountAsync(l => l.Id == old.RequestId))).Should().Be(1);
+        (await AuditEventsAsync()).Should().NotContain(e => e.Action == "request.purged");
     }
 }

@@ -12,7 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     private static readonly (string Name, Guid Id)[] SeededRoles =
     [
         (StaffRoles.Admin, new Guid("a1000000-0000-0000-0000-000000000001")),
-        (StaffRoles.LoanOfficer, new Guid("a1000000-0000-0000-0000-000000000002")),
+        (StaffRoles.Requester, new Guid("a1000000-0000-0000-0000-000000000002")),
         (StaffRoles.Auditor, new Guid("a1000000-0000-0000-0000-000000000004")),
     ];
 
@@ -23,7 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OutboxEmail> OutboxEmails => Set<OutboxEmail>();
     public DbSet<OutboxEmailRead> OutboxEmailReads => Set<OutboxEmailRead>();
     public DbSet<Contact> Contacts => Set<Contact>();
-    public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<Request> Requests => Set<Request>();
     public DbSet<Invite> Invites => Set<Invite>();
     public DbSet<RequestItem> RequestItems => Set<RequestItem>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
@@ -87,19 +87,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasIndex(x => x.Email);
         });
 
-        modelBuilder.Entity<Loan>(e =>
+        modelBuilder.Entity<Request>(e =>
         {
-            e.ToTable("Loans");
+            e.ToTable("Requests");
             e.HasKey(x => x.Id);
             e.Property(x => x.Reference).HasMaxLength(50).IsRequired();
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.Amount).HasPrecision(18, 2);
-            e.Property(x => x.LoanType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RequestType).HasMaxLength(100).IsRequired();
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasIndex(x => x.Reference).IsUnique();
             e.HasIndex(x => new { x.CreatedAt, x.Id });
-            e.HasMany(x => x.Invites).WithOne().HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Invites).WithOne().HasForeignKey(x => x.RequestId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Invite>(e =>
@@ -111,8 +111,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasIndex(x => x.TokenHash).IsUnique();
-            // One invite per party per loan.
-            e.HasIndex(x => new { x.LoanId, x.ContactId }).IsUnique();
+            // One invite per party per request.
+            e.HasIndex(x => new { x.RequestId, x.ContactId }).IsUnique();
             e.HasOne<Contact>().WithMany().HasForeignKey(x => x.ContactId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.InviteId).OnDelete(DeleteBehavior.Cascade);
         });

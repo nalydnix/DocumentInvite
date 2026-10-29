@@ -26,7 +26,7 @@ public sealed record PortalItemResponse(
 
 /// <summary>The party's request: only data of the session's own invite.</summary>
 public sealed record PortalInviteResponse(
-    string LoanName,
+    string RequestName,
     string PartyFirstName,
     DateOnly DueDate,
     CollectionStatus Status,

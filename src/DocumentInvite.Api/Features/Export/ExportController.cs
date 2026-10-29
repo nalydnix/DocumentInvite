@@ -6,13 +6,13 @@ using Microsoft.Net.Http.Headers;
 
 namespace DocumentInvite.Api.Features.Export;
 
-/// <summary>Package export is for Admins and LoanOfficers only.</summary>
+/// <summary>Package export is for Admins and Requesters only.</summary>
 [ApiController]
 [Authorize(Policy = AuthPolicies.RequireStaff)]
 public class ExportController(ExportService service) : ControllerBase
 {
-    /// <summary>Streams a zip of the loan's approved files and form answers straight to the response.</summary>
-    [HttpGet("api/loans/{id:guid}/export")]
+    /// <summary>Streams a zip of the request's approved files and form answers straight to the response.</summary>
+    [HttpGet("api/requests/{id:guid}/export")]
     public async Task<IActionResult> Export(Guid id, CancellationToken ct)
     {
         var plan = await service.PlanAsync(id, ct);
@@ -23,7 +23,7 @@ public class ExportController(ExportService service) : ControllerBase
 
         if (plan.IsEmpty)
         {
-            return Problem(detail: "This loan has no approved documents or answers to export yet.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(detail: "This request has no approved documents or answers to export yet.", statusCode: StatusCodes.Status409Conflict);
         }
 
         await service.AuditAsync(plan, ct);

@@ -4,7 +4,7 @@ namespace DocumentInvite.Api.Features.Auth;
 public static class StaffRoles
 {
     public const string Admin = nameof(StaffRole.Admin);
-    public const string LoanOfficer = nameof(StaffRole.LoanOfficer);
+    public const string Requester = nameof(StaffRole.Requester);
     public const string Auditor = nameof(StaffRole.Auditor);
 
     public static readonly IReadOnlyList<string> All = Enum.GetNames<StaffRole>();
@@ -14,7 +14,7 @@ public static class StaffRoles
 public enum StaffRole
 {
     Admin,
-    LoanOfficer,
+    Requester,
     Auditor,
 }
 

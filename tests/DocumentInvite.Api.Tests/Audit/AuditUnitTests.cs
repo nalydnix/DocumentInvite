@@ -102,7 +102,7 @@ public class AuditUnitTests
             e => e.ActorType = ActorType.Party,
             e => e.ActorId = null,
             e => e.Action = "item.rejected",
-            e => e.TargetType = "loan",
+            e => e.TargetType = "request",
             e => e.TargetId = null,
             e => e.IpAddress = null,
             e => e.UserAgent = "other",

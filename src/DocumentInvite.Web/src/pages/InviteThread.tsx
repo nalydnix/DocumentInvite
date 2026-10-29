@@ -29,7 +29,7 @@ function toEntry(message: StaffMessage, partyName: string): ThreadEntry {
 }
 
 /**
- * The thread with one party, on the loan page. It is closed until opened, so a loan with many parties
+ * The thread with one party, on the request page. It is closed until opened, so a request with many parties
  * does not load every thread at once. Only staff who can write see the box; the API enforces the same.
  */
 export function InviteThread({
