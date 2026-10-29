@@ -100,7 +100,7 @@ By default `Email__Provider` is `Demo`: invites are only stored in the outbox an
    | `Portal__BaseUrl` | The live web origin, for example `https://documentinvite.vercel.app`, with no trailing path. Invite links are built from this value |
 
    With the Azure CLI: `az webapp config appsettings set -g <resource-group> -n <app> --settings Email__Provider=Resend "Email__From=DocumentInvite <invites@mail.example.com>" Resend__ApiKey=<key> Portal__BaseUrl=<web-origin>`.
-4. **Send a test invite.** Sign in to the live site, create a request and invite an external address (for example a personal Gmail or Outlook inbox). Check that the message arrives (also check spam the first time) and that the link opens the borrower portal on the live web origin.
+4. **Send a test invite.** Sign in to the live site, create a request and invite an external address (for example a personal Gmail or Outlook inbox). Check that the message arrives (also check spam the first time) and that the link opens the recipient portal on the live web origin.
 
 Troubleshooting: if no mail arrives, check the Resend dashboard, Logs, for the send attempt and its error. A `403` about the domain means `Email__From` is not on a verified domain. A startup or send error mentioning `Resend:ApiKey` means `Resend__ApiKey` is missing. Links pointing at the wrong host mean `Portal__BaseUrl` is wrong. To go back to storing only, set `Email__Provider` to `Demo`.
 
