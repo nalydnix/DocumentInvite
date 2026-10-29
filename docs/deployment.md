@@ -79,6 +79,31 @@ Set these on the App Service (Settings, Environment variables). `provision` sets
 
 Production behaviour: HTTP redirects to HTTPS, responses carry `Strict-Transport-Security` (one year, subdomains), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, a restrictive `Content-Security-Policy` and a `Permissions-Policy`. CORS only allows the configured origins.
 
+## Real e-mail delivery (Resend)
+
+By default `Email__Provider` is `Demo`: invites are only stored in the outbox and nothing is sent. To deliver to real inboxes, use Resend with a verified sender domain. Resend's shared `onboarding@resend.dev` sender only delivers to the account owner's own address, so external recipients need your own domain.
+
+1. **Create a Resend account and API key.** In the Resend dashboard create an API key with "Sending access".
+2. **Verify a sender domain.** In Resend, Domains, Add Domain (for example `mail.example.com`). Resend lists the DNS records to add at your DNS host:
+   - an SPF record (`TXT` on the `send` subdomain, plus the matching `MX` record Resend shows),
+   - a DKIM record (`TXT` on `resend._domainkey`),
+   - optionally a DMARC `TXT` record on `_dmarc` (for example `v=DMARC1; p=none;`).
+
+   Copy the values exactly as Resend shows them, then click Verify. DNS can take from a few minutes to a few hours; wait until the domain status is "Verified".
+3. **Set the App Service settings** (Settings, Environment variables), then save and let the app restart:
+
+   | Key | Value |
+   | --- | --- |
+   | `Email__Provider` | `Resend` |
+   | `Email__From` | `DocumentInvite <invites@mail.example.com>` (an address on the verified domain) |
+   | `Resend__ApiKey` | The API key from step 1. Keep it out of source control and logs |
+   | `Portal__BaseUrl` | The live web origin, for example `https://documentinvite.vercel.app`, with no trailing path. Invite links are built from this value |
+
+   With the Azure CLI: `az webapp config appsettings set -g <resource-group> -n <app> --settings Email__Provider=Resend "Email__From=DocumentInvite <invites@mail.example.com>" Resend__ApiKey=<key> Portal__BaseUrl=<web-origin>`.
+4. **Send a test invite.** Sign in to the live site, create a request and invite an external address (for example a personal Gmail or Outlook inbox). Check that the message arrives (also check spam the first time) and that the link opens the borrower portal on the live web origin.
+
+Troubleshooting: if no mail arrives, check the Resend dashboard, Logs, for the send attempt and its error. A `403` about the domain means `Email__From` is not on a verified domain. A startup or send error mentioning `Resend:ApiKey` means `Resend__ApiKey` is missing. Links pointing at the wrong host mean `Portal__BaseUrl` is wrong. To go back to storing only, set `Email__Provider` to `Demo`.
+
 ## GitHub secrets
 
 | Secret | Used by | Value |
