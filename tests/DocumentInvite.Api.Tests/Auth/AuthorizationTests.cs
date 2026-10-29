@@ -15,7 +15,7 @@ public class AuthorizationTests : StaffTestBase
         var allowed = new Dictionary<string, string[]>
         {
             [StaffRoles.Admin] = ["admin", "staff", "read", "audit", "any"],
-            [StaffRoles.LoanOfficer] = ["staff", "read", "any"],
+            [StaffRoles.Requester] = ["staff", "read", "any"],
             [StaffRoles.Auditor] = ["audit", "any"],
         };
 

@@ -30,7 +30,7 @@ function item(overrides: Partial<PortalItem>): PortalItem {
 
 function invite(overrides: Partial<PortalInvite> = {}): PortalInvite {
   return {
-    loanName: 'Acme acquisition',
+    requestName: 'Acme acquisition',
     partyFirstName: 'Ann',
     dueDate: '2027-02-01',
     status: 'InProgress',

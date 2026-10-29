@@ -18,7 +18,7 @@ public enum FieldType
     YesNo,
 }
 
-/// <summary>A reusable checklist of documents and data to request for a type of loan.</summary>
+/// <summary>A reusable checklist of documents and data to request for a type of request.</summary>
 public class Template
 {
     public Guid Id { get; set; } = Guid.NewGuid();

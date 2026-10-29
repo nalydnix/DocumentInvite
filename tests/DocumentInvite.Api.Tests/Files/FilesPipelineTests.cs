@@ -37,11 +37,11 @@ public class FilesPipelineTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var contact = new Contact { FirstName = "Pat", LastName = lastName, Email = $"{Guid.NewGuid():N}@example.com" };
-        var loan = new Loan { Reference = reference, Name = "Loan", LoanType = "SBA", CreatedAt = DateTimeOffset.UtcNow };
+        var request = new Request { Reference = reference, Name = "Request", RequestType = "SBA", CreatedAt = DateTimeOffset.UtcNow };
         var item = new RequestItem { Name = itemName, Kind = kind, Instructions = "x", AllowMultiple = true };
         var invite = new Invite
         {
-            LoanId = loan.Id,
+            RequestId = request.Id,
             ContactId = contact.Id,
             TokenHash = RandomNumberGenerator.GetBytes(32),
             TokenExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
@@ -49,9 +49,9 @@ public class FilesPipelineTests : IntegrationTestBase
             SentAt = DateTimeOffset.UtcNow,
             Items = [item],
         };
-        loan.Invites.Add(invite);
+        request.Invites.Add(invite);
         db.Contacts.Add(contact);
-        db.Loans.Add(loan);
+        db.Requests.Add(request);
         await db.SaveChangesAsync();
         return new Seeded(invite.Id, item.Id);
     }

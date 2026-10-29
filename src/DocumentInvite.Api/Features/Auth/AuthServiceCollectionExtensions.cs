@@ -52,8 +52,8 @@ public static class AuthServiceCollectionExtensions
         {
             options.DefaultPolicy = Policy(null);
             options.AddPolicy(AuthPolicies.RequireAdmin, Policy([StaffRoles.Admin]));
-            options.AddPolicy(AuthPolicies.RequireStaff, Policy([StaffRoles.Admin, StaffRoles.LoanOfficer]));
-            options.AddPolicy(AuthPolicies.CanRead, Policy([StaffRoles.Admin, StaffRoles.LoanOfficer]));
+            options.AddPolicy(AuthPolicies.RequireStaff, Policy([StaffRoles.Admin, StaffRoles.Requester]));
+            options.AddPolicy(AuthPolicies.CanRead, Policy([StaffRoles.Admin, StaffRoles.Requester]));
             options.AddPolicy(AuthPolicies.CanAudit, Policy([StaffRoles.Admin, StaffRoles.Auditor]));
         });
 

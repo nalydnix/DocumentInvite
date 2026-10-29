@@ -7,16 +7,16 @@ using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Contacts;
 using DocumentInvite.Api.Features.Invites;
-using DocumentInvite.Api.Features.Loans;
+using DocumentInvite.Api.Features.Requests;
 using DocumentInvite.Api.Infrastructure.Persistence;
 using DocumentInvite.Api.Tests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DocumentInvite.Api.Tests.Loans;
+namespace DocumentInvite.Api.Tests.Requests;
 
-public partial class LoansAndInvitesTests : StaffTestBase
+public partial class RequestsAndInvitesTests : StaffTestBase
 {
     private sealed class TestClock : TimeProvider
     {
@@ -35,7 +35,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
 
     private DateOnly Today => DateOnly.FromDateTime(_clock.Now.UtcDateTime);
 
-    private static LoanRequest ValidLoan(string reference = "LN-1001") =>
+    private static SaveRequestRequest ValidRequest(string reference = "LN-1001") =>
         new(reference, "Acme acquisition", 1_250_000.50m, "SBA 7(a)");
 
     private static InviteItemRequest File(string name = "Tax return", bool required = true) =>
@@ -44,13 +44,13 @@ public partial class LoansAndInvitesTests : StaffTestBase
     private static InviteItemRequest Field(string name = "Years in business") =>
         new(name, ItemKind.FormField, "", AllowMultiple: false, FieldType: Api.Domain.FieldType.Number, IsRequired: true);
 
-    private async Task<HttpClient> OfficerAsync() => await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+    private async Task<HttpClient> RequesterAsync() => await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
-    private static async Task<LoanResponse> CreateLoanAsync(HttpClient client, LoanRequest? request = null)
+    private static async Task<RequestResponse> CreateRequestAsync(HttpClient client, SaveRequestRequest? input = null)
     {
-        var response = await client.PostAsJsonAsync("/api/loans", request ?? ValidLoan());
+        var response = await client.PostAsJsonAsync("/api/requests", input ?? ValidRequest());
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        return (await response.Content.ReadFromJsonAsync<LoanResponse>())!;
+        return (await response.Content.ReadFromJsonAsync<RequestResponse>())!;
     }
 
     private static async Task<ContactResponse> CreateContactAsync(
@@ -66,9 +66,9 @@ public partial class LoansAndInvitesTests : StaffTestBase
         new(contactId, Today.AddDays(10), interval, items.Length == 0 ? [File(), Field()] : items);
 
     private static async Task<IReadOnlyList<InviteResponse>> SendAsync(
-        HttpClient client, Guid loanId, params SendPartyRequest[] parties)
+        HttpClient client, Guid requestId, params SendPartyRequest[] parties)
     {
-        var response = await client.PostAsJsonAsync($"/api/loans/{loanId}/invites", new SendInvitesRequest(parties));
+        var response = await client.PostAsJsonAsync($"/api/requests/{requestId}/invites", new SendInvitesRequest(parties));
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<List<InviteResponse>>())!;
     }
@@ -111,28 +111,28 @@ public partial class LoansAndInvitesTests : StaffTestBase
     {
         var auditor = await ClientForAsync("aud@example.com", [StaffRoles.Auditor]);
 
-        (await auditor.GetAsync("/api/loans")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await NewClient().GetAsync("/api/loans")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await NewClient().PostAsJsonAsync("/api/loans", ValidLoan())).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await auditor.GetAsync("/api/requests")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await NewClient().GetAsync("/api/requests")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await NewClient().PostAsJsonAsync("/api/requests", ValidRequest())).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await NewClient().PostAsync($"/api/invites/{Guid.NewGuid()}/revoke", null))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    // ---- loans ----
+    // ---- requests ----
 
     [Fact]
-    public async Task A_loan_can_be_created_listed_and_viewed()
+    public async Task A_request_can_be_created_listed_and_viewed()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
-        var created = await CreateLoanAsync(client);
-        var fetched = await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{created.Id}");
-        var page = await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans");
+        var created = await CreateRequestAsync(client);
+        var fetched = await client.GetFromJsonAsync<RequestResponse>($"/api/requests/{created.Id}");
+        var page = await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests");
 
         fetched!.Reference.Should().Be("LN-1001");
         fetched.Name.Should().Be("Acme acquisition");
         fetched.Amount.Should().Be(1_250_000.50m);
-        fetched.LoanType.Should().Be("SBA 7(a)");
+        fetched.RequestType.Should().Be("SBA 7(a)");
         fetched.Status.Should().Be(CollectionStatus.Sent);
         fetched.Invites.Should().BeEmpty();
         page!.Total.Should().Be(1);
@@ -142,27 +142,27 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task The_list_can_be_searched_and_filtered_by_status()
     {
-        var client = await OfficerAsync();
-        await CreateLoanAsync(client, ValidLoan("AAA-1"));
-        await CreateLoanAsync(client, ValidLoan("BBB-2"));
+        var client = await RequesterAsync();
+        await CreateRequestAsync(client, ValidRequest("AAA-1"));
+        await CreateRequestAsync(client, ValidRequest("BBB-2"));
 
-        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?search=bbb"))!.Items.Select(l => l.Reference)
+        (await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests?search=bbb"))!.Items.Select(l => l.Reference)
             .Should().Equal("BBB-2");
-        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?status=Completed"))!.Total.Should().Be(0);
-        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?status=Sent"))!.Total.Should().Be(2);
+        (await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests?status=Completed"))!.Total.Should().Be(0);
+        (await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests?status=Sent"))!.Total.Should().Be(2);
     }
 
     [Fact]
     public async Task The_list_uses_the_shared_paging_contract()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         foreach (var n in new[] { "A-1", "A-2", "A-3" })
         {
-            await CreateLoanAsync(client, ValidLoan(n));
+            await CreateRequestAsync(client, ValidRequest(n));
         }
 
-        var defaults = (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!;
-        var page2 = (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?page=2&pageSize=2"))!;
+        var defaults = (await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests"))!;
+        var page2 = (await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests?page=2&pageSize=2"))!;
 
         defaults.PageSize.Should().Be(25);
         page2.Total.Should().Be(3);
@@ -170,48 +170,48 @@ public partial class LoansAndInvitesTests : StaffTestBase
         page2.Items.Should().HaveCount(1);
         foreach (var bad in new[] { "page=0", "pageSize=0", "pageSize=101" })
         {
-            (await client.GetAsync($"/api/loans?{bad}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await client.GetAsync($"/api/requests?{bad}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
     }
 
     [Fact]
-    public async Task Loan_references_are_unique()
+    public async Task Request_references_are_unique()
     {
-        var client = await OfficerAsync();
-        await CreateLoanAsync(client);
+        var client = await RequesterAsync();
+        await CreateRequestAsync(client);
 
-        var duplicate = await client.PostAsJsonAsync("/api/loans", ValidLoan("ln-1001"));
+        var duplicate = await client.PostAsJsonAsync("/api/requests", ValidRequest("ln-1001"));
 
         duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]
-    public async Task Creating_a_loan_validates_its_fields()
+    public async Task Creating_a_request_validates_its_fields()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
-        var empty = await client.PostAsJsonAsync("/api/loans", new { });
+        var empty = await client.PostAsJsonAsync("/api/requests", new { });
         empty.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await ErrorFieldsAsync(empty)).Should().Contain(["reference", "name", "amount", "loanType"]);
+        (await ErrorFieldsAsync(empty)).Should().Contain(["reference", "name", "amount", "requestType"]);
 
         foreach (var bad in new[]
         {
-            new LoanRequest("LN 1", "n", 10, "t"),
-            new LoanRequest("LN-1", "n", 0, "t"),
-            new LoanRequest("LN-1", "n", -5, "t"),
-            new LoanRequest("LN-1", "n", 10.123m, "t"),
+            new SaveRequestRequest("LN 1", "n", 10, "t"),
+            new SaveRequestRequest("LN-1", "n", 0, "t"),
+            new SaveRequestRequest("LN-1", "n", -5, "t"),
+            new SaveRequestRequest("LN-1", "n", 10.123m, "t"),
         })
         {
-            (await client.PostAsJsonAsync("/api/loans", bad)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await client.PostAsJsonAsync("/api/requests", bad)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
     }
 
     [Fact]
-    public async Task Getting_an_unknown_loan_is_a_404()
+    public async Task Getting_an_unknown_request_is_a_404()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
-        (await client.GetAsync($"/api/loans/{Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.GetAsync($"/api/requests/{Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ---- sending ----
@@ -219,12 +219,12 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Sending_creates_one_invite_per_party_with_the_selected_items()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
         var bob = await CreateContactAsync(client, "Bob", "bob@example.com");
-        var loan = await CreateLoanAsync(client);
+        var request = await CreateRequestAsync(client);
 
-        var invites = await SendAsync(client, loan.Id,
+        var invites = await SendAsync(client, request.Id,
             Party(ann.Id, 3, File("Edited name", required: true), File("Optional extra", required: false)),
             Party(bob.Id, null, Field()));
 
@@ -239,21 +239,21 @@ public partial class LoansAndInvitesTests : StaffTestBase
         annInvite.Items.Should().OnlyContain(i => i.Status == RequestItemStatus.Outstanding);
         invites.Single(i => i.ContactId == bob.Id).ReminderIntervalDays.Should().Be(7, "the default comes from the settings");
 
-        var detail = await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{loan.Id}");
+        var detail = await client.GetFromJsonAsync<RequestResponse>($"/api/requests/{request.Id}");
         detail!.Status.Should().Be(CollectionStatus.Sent);
         detail.Invites.Should().HaveCount(2);
-        (await client.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!.Items.Single().PartyCount.Should().Be(2);
+        (await client.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests"))!.Items.Single().PartyCount.Should().Be(2);
     }
 
     [Fact]
     public async Task Sending_emails_each_party_its_portal_link()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
         var bob = await CreateContactAsync(client, "Bob", "bob@example.com");
-        var loan = await CreateLoanAsync(client);
+        var request = await CreateRequestAsync(client);
 
-        await SendAsync(client, loan.Id, Party(ann.Id), Party(bob.Id));
+        await SendAsync(client, request.Id, Party(ann.Id), Party(bob.Id));
 
         var emails = await EmailsAsync();
         emails.Select(e => e.To).Should().BeEquivalentTo("ann@example.com", "bob@example.com");
@@ -264,11 +264,11 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Only_the_sha256_hash_of_the_token_is_stored()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
+        var request = await CreateRequestAsync(client);
 
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
 
         var token = TokenIn((await EmailsAsync()).Single());
         token.Should().MatchRegex("^[A-Za-z0-9_-]{43}$", "32 random bytes in base64url");
@@ -282,13 +282,13 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task The_link_expires_thirty_days_after_the_due_date()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
+        var request = await CreateRequestAsync(client);
         var due = new DateOnly(2030, 6, 1);
 
 
-        var invite = (await SendAsync(client, loan.Id, new SendPartyRequest(ann.Id, due, null, [File()])))[0];
+        var invite = (await SendAsync(client, request.Id, new SendPartyRequest(ann.Id, due, null, [File()])))[0];
 
         invite.TokenExpiresAt.Should().Be(new DateTimeOffset(2030, 7, 1, 0, 0, 0, TimeSpan.Zero));
         var token = TokenIn((await EmailsAsync()).Single());
@@ -308,19 +308,19 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Sending_is_audited_with_ids_only()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
+        var request = await CreateRequestAsync(client);
 
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
 
         var events = await AuditEventsAsync();
-        events.Should().Contain(e => e.Action == "loan.created" && e.TargetId == loan.Id);
+        events.Should().Contain(e => e.Action == "request.created" && e.TargetId == request.Id);
         var sent = events.Single(e => e.Action == "invite.sent");
         sent.TargetType.Should().Be("invite");
         sent.TargetId.Should().Be(invite.Id);
-        sent.DetailsJson.Should().Contain(loan.Id.ToString()).And.Contain(ann.Id.ToString());
-        foreach (var e in events.Where(e => e.Action is "loan.created" or "invite.sent"))
+        sent.DetailsJson.Should().Contain(request.Id.ToString()).And.Contain(ann.Id.ToString());
+        foreach (var e in events.Where(e => e.Action is "request.created" or "invite.sent"))
         {
             e.DetailsJson.Should().NotContainAny("Ann", "Lee", "example.com", "Acme", "LN-1001", "Tax return");
             e.ActorId.Should().NotBeNull();
@@ -328,14 +328,14 @@ public partial class LoansAndInvitesTests : StaffTestBase
     }
 
     [Fact]
-    public async Task A_party_cannot_be_invited_twice_to_the_same_loan()
+    public async Task A_party_cannot_be_invited_twice_to_the_same_request()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        await SendAsync(client, loan.Id, Party(ann.Id));
+        var request = await CreateRequestAsync(client);
+        await SendAsync(client, request.Id, Party(ann.Id));
 
-        var again = await client.PostAsJsonAsync($"/api/loans/{loan.Id}/invites", new SendInvitesRequest([Party(ann.Id)]));
+        var again = await client.PostAsJsonAsync($"/api/requests/{request.Id}/invites", new SendInvitesRequest([Party(ann.Id)]));
 
         again.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await EmailsAsync()).Should().HaveCount(1);
@@ -344,26 +344,26 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task A_rejected_request_creates_nothing()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
+        var request = await CreateRequestAsync(client);
 
-        var response = await client.PostAsJsonAsync($"/api/loans/{loan.Id}/invites",
+        var response = await client.PostAsJsonAsync($"/api/requests/{request.Id}/invites",
             new SendInvitesRequest([Party(ann.Id), Party(Guid.NewGuid())]));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await ErrorFieldsAsync(response)).Should().Contain("parties[1].contactId");
-        (await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{loan.Id}"))!.Invites.Should().BeEmpty();
+        (await client.GetFromJsonAsync<RequestResponse>($"/api/requests/{request.Id}"))!.Invites.Should().BeEmpty();
         (await EmailsAsync()).Should().BeEmpty();
     }
 
     [Fact]
     public async Task Sending_validates_the_request()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        var url = $"/api/loans/{loan.Id}/invites";
+        var request = await CreateRequestAsync(client);
+        var url = $"/api/requests/{request.Id}/invites";
 
         (await client.PostAsJsonAsync(url, new SendInvitesRequest([]))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await client.PostAsJsonAsync(url, new SendInvitesRequest([new SendPartyRequest(ann.Id, Today.AddDays(1), null, [])])))
@@ -383,7 +383,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
         past.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await ErrorFieldsAsync(past)).Should().Contain("parties[0].dueDate");
 
-        (await client.PostAsJsonAsync($"/api/loans/{Guid.NewGuid()}/invites", new SendInvitesRequest([Party(ann.Id)])))
+        (await client.PostAsJsonAsync($"/api/requests/{Guid.NewGuid()}/invites", new SendInvitesRequest([Party(ann.Id)])))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -392,10 +392,10 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Revoking_stops_the_link_working_and_is_audited()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var request = await CreateRequestAsync(client);
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
         var token = TokenIn((await EmailsAsync()).Single());
 
         var response = await client.PostAsync($"/api/invites/{invite.Id}/revoke", null);
@@ -410,10 +410,10 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Reissuing_replaces_the_link_and_the_old_one_stops_working()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var request = await CreateRequestAsync(client);
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
         var oldToken = TokenIn((await EmailsAsync()).Single());
         await client.PostAsync($"/api/invites/{invite.Id}/revoke", null);
 
@@ -434,10 +434,10 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Reissuing_an_active_invite_also_invalidates_the_old_link()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var request = await CreateRequestAsync(client);
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
         var oldToken = TokenIn((await EmailsAsync()).Single());
 
         (await client.PostAsync($"/api/invites/{invite.Id}/reissue", null)).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -448,10 +448,10 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task A_reissued_link_gets_a_fresh_expiry_when_the_due_date_is_long_past()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var request = await CreateRequestAsync(client);
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -468,10 +468,10 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task A_completed_invite_cannot_be_reissued()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
-        var loan = await CreateLoanAsync(client);
-        var invite = (await SendAsync(client, loan.Id, Party(ann.Id)))[0];
+        var request = await CreateRequestAsync(client);
+        var invite = (await SendAsync(client, request.Id, Party(ann.Id)))[0];
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -484,7 +484,7 @@ public partial class LoansAndInvitesTests : StaffTestBase
     [Fact]
     public async Task Unknown_invites_are_a_404()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
         (await client.PostAsync($"/api/invites/{Guid.NewGuid()}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await client.PostAsync($"/api/invites/{Guid.NewGuid()}/reissue", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -494,24 +494,24 @@ public partial class LoansAndInvitesTests : StaffTestBase
     // ---- status ----
 
     [Fact]
-    public async Task The_loan_status_follows_its_active_invites_and_is_ReadyToComplete_without_CompletedAt()
+    public async Task The_request_status_follows_its_active_invites_and_is_ReadyToComplete_without_CompletedAt()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var ann = await CreateContactAsync(client);
         var bob = await CreateContactAsync(client, "Bob", "bob@example.com");
-        var loan = await CreateLoanAsync(client);
-        var invites = await SendAsync(client, loan.Id, Party(ann.Id, null, File()), Party(bob.Id, null, File()));
+        var request = await CreateRequestAsync(client);
+        var invites = await SendAsync(client, request.Id, Party(ann.Id, null, File()), Party(bob.Id, null, File()));
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.RequestItems.ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, RequestItemStatus.Approved));
         }
 
-        // Revoking triggers a recalculation: Bob's invite is excluded, Ann's is approved, so the loan is ready to complete.
+        // Revoking triggers a recalculation: Bob's invite is excluded, Ann's is approved, so the request is ready to complete.
         var bobInvite = invites.Single(i => i.ContactId == bob.Id);
         await client.PostAsync($"/api/invites/{bobInvite.Id}/revoke", null);
 
-        var detail = await client.GetFromJsonAsync<LoanResponse>($"/api/loans/{loan.Id}");
+        var detail = await client.GetFromJsonAsync<RequestResponse>($"/api/requests/{request.Id}");
         detail!.Status.Should().Be(CollectionStatus.ReadyToComplete);
         detail.CompletedAt.Should().BeNull();
         detail.Invites.Single(i => i.ContactId == ann.Id).Status.Should().Be(CollectionStatus.Completed);

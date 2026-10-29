@@ -22,8 +22,8 @@ public abstract class DemoTestBase : StaffTestBase
     protected const string AdminPassword = "Demo-Admin-Passw0rd!";
     protected const string AuditorEmail = "auditor@demo.test";
     protected const string AuditorPassword = "Demo-Auditor-Passw0rd!";
-    protected const string OfficerEmail = "officer@demo.test";
-    protected const string OfficerPassword = "Demo-Officer-Passw0rd!";
+    protected const string RequesterEmail = "requester@demo.test";
+    protected const string RequesterPassword = "Demo-Requester-Passw0rd!";
 
     protected readonly FakeBlobStore Blobs = new();
 
@@ -38,7 +38,7 @@ public abstract class DemoTestBase : StaffTestBase
         {
             o.Enabled = DemoEnabled;
             o.Accounts["Admin"] = new DemoAccountOptions { Email = AdminEmail, Password = AdminPassword };
-            o.Accounts["LoanOfficer"] = new DemoAccountOptions { Email = OfficerEmail, Password = OfficerPassword };
+            o.Accounts["Requester"] = new DemoAccountOptions { Email = RequesterEmail, Password = RequesterPassword };
             o.Accounts["Auditor"] = new DemoAccountOptions { Email = AuditorEmail, Password = AuditorPassword };
         });
     }
@@ -68,27 +68,27 @@ public class DemoSeedingTests : DemoTestBase
         _ = Factory.Services; // starts the host, which seeds
         await SignInAsync(AdminEmail, AdminPassword);
         await SignInAsync(AuditorEmail, AuditorPassword);
-        await SignInAsync(OfficerEmail, OfficerPassword);
+        await SignInAsync(RequesterEmail, RequesterPassword);
 
         var config = await NewClient().GetFromJsonAsync<DemoConfigResponse>("/api/demo/config");
         config!.Enabled.Should().BeTrue();
-        config.Logins.Select(l => l.Role).Should().BeEquivalentTo(["Admin", "LoanOfficer", "Auditor"]);
+        config.Logins.Select(l => l.Role).Should().BeEquivalentTo(["Admin", "Requester", "Auditor"]);
         config.Logins.Single(l => l.Role == "Admin").Should().Be(new DemoLogin("Admin", AdminEmail, AdminPassword));
     }
 
     [Fact]
-    public async Task Seeding_creates_three_loans_in_the_expected_states_with_files_and_audit_events()
+    public async Task Seeding_creates_three_requests_in_the_expected_states_with_files_and_audit_events()
     {
         _ = Factory.Services;
-        var loans = await LoansAsync();
-        loans.Should().Equal(
+        var requests = await RequestsAsync();
+        requests.Should().Equal(
             (DemoSeeder.SentReference, CollectionStatus.Sent),
             (DemoSeeder.PartlyUploadedReference, CollectionStatus.InProgress),
             (DemoSeeder.ApprovedReference, CollectionStatus.ReadyToComplete));
 
         await WithDbAsync(async db =>
         {
-            var partly = await db.Loans.Where(l => l.Reference == DemoSeeder.PartlyUploadedReference)
+            var partly = await db.Requests.Where(l => l.Reference == DemoSeeder.PartlyUploadedReference)
                 .SelectMany(l => l.Invites).SelectMany(i => i.Items).ToListAsync();
             partly.Count(i => i.Status == RequestItemStatus.Rejected).Should().Be(1);
             partly.Count(i => i.Status == RequestItemStatus.Submitted).Should().BeGreaterThan(0);
@@ -106,7 +106,7 @@ public class DemoSeedingTests : DemoTestBase
 
         var events = await AuditEventsAsync();
         events.Select(e => e.Action).Should().Contain(
-            ["loan.created", "invite.sent", "portal.opened", "file.uploaded", "item.rejected", "item.approved"]);
+            ["request.created", "invite.sent", "portal.opened", "file.uploaded", "item.rejected", "item.approved"]);
         events.Where(e => e.Action != "user.created").Should().OnlyContain(e => e.ActorType == ActorType.System);
     }
 
@@ -114,7 +114,7 @@ public class DemoSeedingTests : DemoTestBase
     public async Task Seeding_again_changes_nothing()
     {
         _ = Factory.Services;
-        var before = await LoansAsync();
+        var before = await RequestsAsync();
         var eventsBefore = (await AuditEventsAsync()).Count;
 
         using (var scope = Factory.Services.CreateScope())
@@ -122,25 +122,25 @@ public class DemoSeedingTests : DemoTestBase
             await scope.ServiceProvider.GetRequiredService<DemoSeeder>().SeedAsync();
         }
 
-        (await LoansAsync()).Should().Equal(before);
+        (await RequestsAsync()).Should().Equal(before);
         (await AuditEventsAsync()).Should().HaveCount(eventsBefore);
     }
 
     [Fact]
-    public async Task Resetting_twice_produces_the_same_three_loans_and_keeps_the_audit_log()
+    public async Task Resetting_twice_produces_the_same_three_requests_and_keeps_the_audit_log()
     {
         _ = Factory.Services;
         var admin = await SignedInAsync(AdminEmail, AdminPassword);
-        var expected = await LoansAsync();
+        var expected = await RequestsAsync();
         var originalEvents = await AuditEventsAsync();
         var originalBlobs = await BlobNamesAsync();
 
         (await admin.PostAsync("/api/demo/reset", null)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await LoansAsync()).Should().Equal(expected);
+        (await RequestsAsync()).Should().Equal(expected);
         var blobsAfterFirst = await BlobNamesAsync();
 
         (await admin.PostAsync("/api/demo/reset", null)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await LoansAsync()).Should().Equal(expected);
+        (await RequestsAsync()).Should().Equal(expected);
         (await WithDbAsync(db => db.Contacts.CountAsync())).Should().Be(3);
         (await WithDbAsync(db => db.OutboxEmails.CountAsync())).Should().Be(3);
 
@@ -164,14 +164,14 @@ public class DemoSeedingTests : DemoTestBase
     {
         _ = Factory.Services;
         (await NewClient().PostAsync("/api/demo/reset", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var officer = await SignedInAsync(OfficerEmail, OfficerPassword);
-        (await officer.PostAsync("/api/demo/reset", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var requester = await SignedInAsync(RequesterEmail, RequesterPassword);
+        (await requester.PostAsync("/api/demo/reset", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var auditor = await SignedInAsync(AuditorEmail, AuditorPassword);
         (await auditor.PostAsync("/api/demo/reset", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    private Task<List<(string Reference, CollectionStatus Status)>> LoansAsync() =>
-        WithDbAsync(async db => (await db.Loans.AsNoTracking().OrderBy(l => l.Reference).ToListAsync())
+    private Task<List<(string Reference, CollectionStatus Status)>> RequestsAsync() =>
+        WithDbAsync(async db => (await db.Requests.AsNoTracking().OrderBy(l => l.Reference).ToListAsync())
             .Select(l => (l.Reference, l.Status)).ToList());
 
     private Task<List<string>> BlobNamesAsync() =>
@@ -190,7 +190,7 @@ public class DemoDisabledTests : DemoTestBase
         config.Logins.Should().BeEmpty();
 
         (await PostLoginAsync(AdminEmail, AdminPassword)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await WithDbAsync(db => db.Loans.CountAsync())).Should().Be(0);
+        (await WithDbAsync(db => db.Requests.CountAsync())).Should().Be(0);
     }
 
     [Fact]

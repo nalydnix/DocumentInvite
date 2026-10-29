@@ -14,7 +14,7 @@ namespace DocumentInvite.Api.Tests.Templates;
 
 public class TemplateTests : StaffTestBase
 {
-    private Task<HttpClient> OfficerAsync() => ClientForAsync("officer@example.com", [StaffRoles.LoanOfficer]);
+    private Task<HttpClient> RequesterAsync() => ClientForAsync("requester@example.com", [StaffRoles.Requester]);
 
     private static TemplateItemRequest Upload(string name, bool required = true, bool multiple = false, Guid? id = null) =>
         new(id, name, ItemKind.FileUpload, "Please upload.", multiple, null, required);
@@ -51,7 +51,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task The_template_list_pages_by_name_with_a_partial_last_page()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         await SeedAsync(5);
 
         var first = (await ListAsync(client, "page=1&pageSize=3"))!;
@@ -67,7 +67,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task A_template_page_past_the_end_is_empty_with_the_real_total()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
         var page = (await ListAsync(client, "page=9&pageSize=2"))!;
 
@@ -79,7 +79,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Templates_with_the_same_name_still_page_without_overlap()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -99,7 +99,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task The_archived_filter_applies_across_pages()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         await SeedAsync(3, archived: true);
 
         (await ListAsync(client, "pageSize=2"))!.Total.Should().Be(2);
@@ -116,7 +116,7 @@ public class TemplateTests : StaffTestBase
     [InlineData("page=abc")]
     public async Task The_template_list_rejects_bad_paging(string query)
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
         (await client.GetAsync($"/api/templates?{query}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -124,9 +124,9 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task The_two_lending_templates_are_seeded_with_items_and_form_fields()
     {
-        var officer = await ClientForAsync("officer@example.com", [StaffRoles.LoanOfficer]);
+        var requester = await ClientForAsync("requester@example.com", [StaffRoles.Requester]);
 
-        var page = await officer.GetFromJsonAsync<PagedResponse<TemplateSummaryResponse>>("/api/templates");
+        var page = await requester.GetFromJsonAsync<PagedResponse<TemplateSummaryResponse>>("/api/templates");
         var list = page!.Items;
 
         page.Total.Should().Be(2);
@@ -138,7 +138,7 @@ public class TemplateTests : StaffTestBase
 
         foreach (var summary in list)
         {
-            var template = await officer.GetFromJsonAsync<TemplateResponse>($"/api/templates/{summary.Id}");
+            var template = await requester.GetFromJsonAsync<TemplateResponse>($"/api/templates/{summary.Id}");
             template!.Items.Select(i => i.SortOrder).Should().BeInAscendingOrder();
             template.Items.Should().Contain(i => i.Kind == ItemKind.FileUpload && i.AllowMultiple);
             template.Items.Where(i => i.Kind == ItemKind.FormField).Should()
@@ -150,10 +150,10 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Seeding_twice_creates_no_duplicates_and_keeps_staff_edits()
     {
-        var officer = await OfficerAsync();
-        var sba = await officer.GetFromJsonAsync<TemplateResponse>($"/api/templates/{TemplateSeeder.SbaTemplateId}");
+        var requester = await RequesterAsync();
+        var sba = await requester.GetFromJsonAsync<TemplateResponse>($"/api/templates/{TemplateSeeder.SbaTemplateId}");
         var edit = Request("Renamed SBA checklist", Upload("Only item"));
-        (await officer.PutAsJsonAsync($"/api/templates/{sba!.Id}", edit)).EnsureSuccessStatusCode();
+        (await requester.PutAsJsonAsync($"/api/templates/{sba!.Id}", edit)).EnsureSuccessStatusCode();
 
         using (var scope = Factory.Services.CreateScope())
         {
@@ -185,13 +185,13 @@ public class TemplateTests : StaffTestBase
 
     [Theory]
     [InlineData(StaffRoles.Admin)]
-    [InlineData(StaffRoles.LoanOfficer)]
+    [InlineData(StaffRoles.Requester)]
     public async Task Staff_can_create_a_template_and_read_it_back_in_order(string role)
     {
         var client = await ClientForAsync("staff@example.com", [role]);
-        var request = Request("Equipment loan", Upload("Invoice", multiple: true), Form("Year", FieldType.Number), Upload("Quote", false));
+        var input = Request("Equipment request", Upload("Invoice", multiple: true), Form("Year", FieldType.Number), Upload("Quote", false));
 
-        var response = await client.PostAsJsonAsync("/api/templates", request);
+        var response = await client.PostAsJsonAsync("/api/templates", input);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await ReadAsync(response);
@@ -208,7 +208,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Editing_renames_reorders_adds_and_removes_items()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var created = await ReadAsync(await client.PostAsJsonAsync("/api/templates",
             Request("Checklist", Upload("A"), Upload("B"), Upload("C"))));
         var (a, b, c) = (created.Items[0], created.Items[1], created.Items[2]);
@@ -228,7 +228,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Editing_with_an_item_from_another_template_is_rejected()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var one = await ReadAsync(await client.PostAsJsonAsync("/api/templates", Request("One", Upload("A"))));
         var two = await ReadAsync(await client.PostAsJsonAsync("/api/templates", Request("Two", Upload("B"))));
 
@@ -241,7 +241,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Archived_templates_are_hidden_by_default_and_cannot_be_edited_until_restored()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var created = await ReadAsync(await client.PostAsJsonAsync("/api/templates", Request("Old", Upload("A"))));
 
         var archived = await ReadAsync(await client.PostAsync($"/api/templates/{created.Id}/archive", null));
@@ -264,7 +264,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Unknown_templates_return_not_found()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var id = Guid.NewGuid();
 
         (await client.GetAsync($"/api/templates/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -275,10 +275,10 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task A_form_field_without_a_field_type_is_a_validation_error()
     {
-        var client = await OfficerAsync();
-        var request = Request("Bad", new TemplateItemRequest(null, "Revenue", ItemKind.FormField, "", false, null, true));
+        var client = await RequesterAsync();
+        var input = Request("Bad", new TemplateItemRequest(null, "Revenue", ItemKind.FormField, "", false, null, true));
 
-        var response = await client.PostAsJsonAsync("/api/templates", request);
+        var response = await client.PostAsJsonAsync("/api/templates", input);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("items[0].fieldType").And.Contain("requires a field type");
@@ -296,7 +296,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task Template_changes_are_audited_with_ids_and_counts_only()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
         var created = await ReadAsync(await client.PostAsJsonAsync("/api/templates",
             Request("Secret borrower name", Upload("A"), Upload("B"))));
         await client.PutAsJsonAsync($"/api/templates/{created.Id}",
@@ -317,7 +317,7 @@ public class TemplateTests : StaffTestBase
     [Fact]
     public async Task A_failed_validation_writes_no_audit_event()
     {
-        var client = await OfficerAsync();
+        var client = await RequesterAsync();
 
         await client.PostAsJsonAsync("/api/templates", new SaveTemplateRequest("", null, []));
 

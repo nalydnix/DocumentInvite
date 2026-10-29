@@ -7,8 +7,8 @@ public interface IPortalLinkBuilder
     /// <summary>The link a party opens, <c>{Portal:BaseUrl}/p/{token}</c>.</summary>
     string For(string token);
 
-    /// <summary>The link a staff member opens to see a loan, <c>{Portal:BaseUrl}/loans/{loanId}</c>.</summary>
-    string ForLoan(Guid loanId);
+    /// <summary>The link a staff member opens to see a request, <c>{Portal:BaseUrl}/requests/{requestId}</c>.</summary>
+    string ForRequest(Guid requestId);
 }
 
 public sealed class PortalLinkBuilder(IOptions<PortalOptions> options) : IPortalLinkBuilder
@@ -19,7 +19,7 @@ public sealed class PortalLinkBuilder(IOptions<PortalOptions> options) : IPortal
         return $"{Origin()}/p/{Uri.EscapeDataString(token)}";
     }
 
-    public string ForLoan(Guid loanId) => $"{Origin()}/loans/{loanId:D}";
+    public string ForRequest(Guid requestId) => $"{Origin()}/requests/{requestId:D}";
 
     private string Origin()
     {

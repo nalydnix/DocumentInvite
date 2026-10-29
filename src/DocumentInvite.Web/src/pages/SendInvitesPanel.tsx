@@ -5,7 +5,7 @@ import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from 
 import { ApiError, apiFetch } from '../lib/api';
 import type { PagedResponse } from '../lib/paging';
 import type { ContactPage } from './contacts';
-import type { FieldType, Invite, ItemKind } from './loans';
+import type { FieldType, Invite, ItemKind } from './requests';
 
 interface TemplateSummary {
   id: string;
@@ -53,7 +53,7 @@ function messagesOf(error: unknown): string[] {
 }
 
 /** Sends the invites: choose parties, apply a template to each, tick and edit items, set the dates. */
-export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; existingInvites: Invite[] }) {
+export function SendInvitesPanel({ requestId, existingInvites }: { requestId: string; existingInvites: Invite[] }) {
   const queryClient = useQueryClient();
   const counter = useRef(0);
   const nextKey = () => `k${(counter.current += 1)}`;
@@ -72,7 +72,7 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
 
   const send = useMutation({
     mutationFn: () =>
-      apiFetch<Invite[]>(`/api/loans/${loanId}/invites`, {
+      apiFetch<Invite[]>(`/api/requests/${requestId}/invites`, {
         method: 'POST',
         body: {
           parties: parties.map((party) => ({
@@ -95,8 +95,8 @@ export function SendInvitesPanel({ loanId, existingInvites }: { loanId: string; 
       }),
     onSuccess: async () => {
       setParties([]);
-      await queryClient.invalidateQueries({ queryKey: ['loan', loanId] });
-      await queryClient.invalidateQueries({ queryKey: ['loans'] });
+      await queryClient.invalidateQueries({ queryKey: ['request', requestId] });
+      await queryClient.invalidateQueries({ queryKey: ['requests'] });
     },
   });
 

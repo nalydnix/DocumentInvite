@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ErrorList, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
-import type { ItemFile, ReadUrl } from './loans';
+import type { ItemFile, ReadUrl } from './requests';
 
 /**
  * Previews one file inline through a short-lived read link. Every link requested is audited by the

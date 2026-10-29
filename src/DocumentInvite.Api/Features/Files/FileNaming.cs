@@ -3,7 +3,7 @@ using System.Text;
 
 namespace DocumentInvite.Api.Features.Files;
 
-/// <summary>Builds canonical file names: <c>{LoanRef}_{PartyLastName}_{ItemName}_{n}.{ext}</c>.</summary>
+/// <summary>Builds canonical file names: <c>{RequestRef}_{PartyLastName}_{ItemName}_{n}.{ext}</c>.</summary>
 public static class FileNaming
 {
     public const int MaxSegmentLength = 40;
@@ -45,10 +45,10 @@ public static class FileNaming
         return result.Length == 0 ? EmptySegment : result;
     }
 
-    public static string Canonical(string loanReference, string partyLastName, string itemName, int sequence, string extension)
+    public static string Canonical(string requestReference, string partyLastName, string itemName, int sequence, string extension)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(sequence, 1);
-        return $"{Sanitise(loanReference)}_{Sanitise(partyLastName)}_{Sanitise(itemName)}_{sequence}.{extension.TrimStart('.').ToLowerInvariant()}";
+        return $"{Sanitise(requestReference)}_{Sanitise(partyLastName)}_{Sanitise(itemName)}_{sequence}.{extension.TrimStart('.').ToLowerInvariant()}";
     }
 
     /// <summary>The next sequence number for an item, given the sequences already used.</summary>

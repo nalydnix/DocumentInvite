@@ -19,16 +19,16 @@ public class OutboxIntegrationTests : StaffTestBase
 {
     private static readonly EmailMessage Sample = EmailMessage.From(
         "pat@example.com",
-        EmailTemplates.Invite(new("Pat", "Loan 42", "https://app.example.com/p/tok", new DateOnly(2027, 3, 5), 2)));
+        EmailTemplates.Invite(new("Pat", "Request 42", "https://app.example.com/p/tok", new DateOnly(2027, 3, 5), 2)));
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         public List<(HttpRequestMessage Request, string Body)> Calls { get; } = [];
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage input, CancellationToken ct)
         {
-            Calls.Add((request, request.Content is null ? "" : await request.Content.ReadAsStringAsync(ct)));
-            return respond(request);
+            Calls.Add((input, input.Content is null ? "" : await input.Content.ReadAsStringAsync(ct)));
+            return respond(input);
         }
     }
 
@@ -91,9 +91,9 @@ public class OutboxIntegrationTests : StaffTestBase
         stored.ProviderMessageId.Should().Be("resend-msg-1");
         stored.DeliveryError.Should().BeNull();
 
-        var (request, body) = handler.Calls.Should().ContainSingle().Subject;
-        request.RequestUri!.AbsoluteUri.Should().Be("https://api.resend.com/emails");
-        request.Headers.Authorization!.ToString().Should().Be("Bearer re_test_key");
+        var (input, body) = handler.Calls.Should().ContainSingle().Subject;
+        input.RequestUri!.AbsoluteUri.Should().Be("https://api.resend.com/emails");
+        input.Headers.Authorization!.ToString().Should().Be("Bearer re_test_key");
         using var json = JsonDocument.Parse(body);
         json.RootElement.GetProperty("from").GetString().Should().Be("Lender <lender@example.com>");
         json.RootElement.GetProperty("to")[0].GetString().Should().Be("pat@example.com");
@@ -162,7 +162,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Staff_see_the_outbox_newest_first()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         await SendAsync(Factory, Sample with { Subject = "first" });
         await Task.Delay(20);
         await SendAsync(Factory, Sample with { Subject = "second" });
@@ -269,7 +269,7 @@ public class OutboxIntegrationTests : StaffTestBase
 
     [Theory]
     [InlineData(StaffRoles.Auditor)]
-    public async Task Only_admins_and_loan_officers_can_read_the_outbox(string role)
+    public async Task Only_admins_and_request_requesters_can_read_the_outbox(string role)
     {
         var client = await ClientForAsync("other@example.com", [role]);
         var result = await SendAsync(Factory, Sample);
@@ -291,7 +291,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Emails_start_unread_and_are_counted()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         await SendAsync(Factory, Sample);
         await SendAsync(Factory, Sample);
 
@@ -303,7 +303,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Marking_read_and_unread_updates_the_list_detail_and_count()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
         await SendAsync(Factory, Sample);
 
@@ -323,7 +323,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Marking_read_or_unread_twice_is_harmless()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
 
         (await client.PostAsync($"/api/outbox/{id}/read", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -338,7 +338,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Read_state_is_kept_per_user()
     {
-        var first = await ClientForAsync("lo1@example.com", [StaffRoles.LoanOfficer]);
+        var first = await ClientForAsync("lo1@example.com", [StaffRoles.Requester]);
         var second = await ClientForAsync("lo2@example.com", [StaffRoles.Admin]);
         var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
 
@@ -352,7 +352,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Marking_an_unknown_email_returns_404()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
         (await client.PostAsync($"/api/outbox/{Guid.NewGuid()}/read", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await client.PostAsync($"/api/outbox/{Guid.NewGuid()}/unread", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -361,7 +361,7 @@ public class OutboxIntegrationTests : StaffTestBase
     [Fact]
     public async Task Deleting_an_email_removes_its_read_rows()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         var id = (await SendAsync(Factory, Sample)).OutboxEmailId;
         await client.PostAsync($"/api/outbox/{id}/read", null);
 

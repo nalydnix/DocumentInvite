@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorList, inputClass, primaryButtonClass, secondaryButtonClass } from '../components/Field';
 import { ApiError, apiFetch } from '../lib/api';
 import { FilePreview } from './FilePreview';
-import { formatBytes, type InviteItem, type ItemFile, type ReadUrl, type RequestItemStatus } from './loans';
+import { formatBytes, type InviteItem, type ItemFile, type ReadUrl, type RequestItemStatus } from './requests';
 
 const ITEM_STATUS_STYLES: Record<RequestItemStatus, string> = {
   Outstanding: 'bg-surface-muted text-ink-muted',
@@ -12,7 +12,7 @@ const ITEM_STATUS_STYLES: Record<RequestItemStatus, string> = {
   Rejected: 'bg-red-50 text-red-700',
 };
 
-const LOCKED_HINT = 'This loan is completed. Reopen it to review items.';
+const LOCKED_HINT = 'This request is completed. Reopen it to review items.';
 
 function messagesOf(error: unknown): string[] {
   return error instanceof ApiError ? error.messages : error ? ['Something went wrong. Please try again.'] : [];
@@ -64,14 +64,14 @@ function FileRow({ file, canWrite, label }: { file: ItemFile; canWrite: boolean;
 /** One requested item: its status, answers and files, with approve and reject for those who may review. */
 export function ItemReview({
   item,
-  loanId,
+  requestId,
   canWrite,
   locked = false,
 }: {
   item: InviteItem;
-  loanId: string;
+  requestId: string;
   canWrite: boolean;
-  /** True on a Completed loan: review controls stay visible but disabled. */
+  /** True on a Completed request: review controls stay visible but disabled. */
   locked?: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -79,8 +79,8 @@ export function ItemReview({
   const [reason, setReason] = useState('');
 
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['loan', loanId] });
-    await queryClient.invalidateQueries({ queryKey: ['loans'] });
+    await queryClient.invalidateQueries({ queryKey: ['request', requestId] });
+    await queryClient.invalidateQueries({ queryKey: ['requests'] });
   };
   const approve = useMutation({
     mutationFn: () => apiFetch(`/api/items/${item.id}/approve`, { method: 'POST' }),

@@ -6,13 +6,13 @@ using Microsoft.AspNetCore.Mvc;
 namespace DocumentInvite.Api.Features.Messaging;
 
 /// <summary>
-/// The thread on an invite, for staff. Everyone who can read a loan can read the thread, but only
-/// Admins and Loan officers can post, and only they see internal notes.
+/// The thread on an invite, for staff. Everyone who can read a request can read the thread, but only
+/// Admins and Requesters can post, and only they see internal notes.
 /// </summary>
 [ApiController]
 public class MessagesController(MessagingService service) : ControllerBase
 {
-    private bool CanSeeInternal => User.IsInRole(StaffRoles.Admin) || User.IsInRole(StaffRoles.LoanOfficer);
+    private bool CanSeeInternal => User.IsInRole(StaffRoles.Admin) || User.IsInRole(StaffRoles.Requester);
 
     [HttpGet("api/invites/{id:guid}/messages")]
     [Authorize(Policy = AuthPolicies.CanRead)]
@@ -21,13 +21,13 @@ public class MessagesController(MessagingService service) : ControllerBase
 
     [HttpPost("api/invites/{id:guid}/messages")]
     [Authorize(Policy = AuthPolicies.RequireStaff)]
-    public async Task<IActionResult> Post(Guid id, PostMessageRequest request, CancellationToken ct) =>
-        ToActionResult(await service.PostTeamMessageAsync(id, request.Body!, ct), created: true);
+    public async Task<IActionResult> Post(Guid id, PostMessageRequest input, CancellationToken ct) =>
+        ToActionResult(await service.PostTeamMessageAsync(id, input.Body!, ct), created: true);
 
     [HttpPost("api/invites/{id:guid}/notes")]
     [Authorize(Policy = AuthPolicies.RequireStaff)]
-    public async Task<IActionResult> PostNote(Guid id, PostMessageRequest request, CancellationToken ct) =>
-        ToActionResult(await service.PostInternalNoteAsync(id, request.Body!, ct), created: true);
+    public async Task<IActionResult> PostNote(Guid id, PostMessageRequest input, CancellationToken ct) =>
+        ToActionResult(await service.PostInternalNoteAsync(id, input.Body!, ct), created: true);
 
     private IActionResult ToActionResult<T>(MessageResult<T> result, bool created)
     {

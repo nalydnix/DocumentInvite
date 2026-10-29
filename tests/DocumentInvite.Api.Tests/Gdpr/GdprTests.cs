@@ -39,7 +39,7 @@ public class GdprTests : StaffTestBase
             FirstName = "Pat", LastName = "Doe", Email = email, Phone = "+1 555 010 2030",
             PartyType = PartyType.Borrower, CreatedAt = DateTimeOffset.UtcNow,
         };
-        var loan = new Loan { Reference = "LN-7", Name = "Acme loan", LoanType = "SBA", Amount = 5, CreatedAt = DateTimeOffset.UtcNow };
+        var request = new Request { Reference = "LN-7", Name = "Acme request", RequestType = "SBA", Amount = 5, CreatedAt = DateTimeOffset.UtcNow };
         var fileItem = new RequestItem
         {
             Name = "Bank statements", Kind = ItemKind.FileUpload, Instructions = "x", IsRequired = true,
@@ -52,17 +52,17 @@ public class GdprTests : StaffTestBase
         };
         var invite = new Invite
         {
-            LoanId = loan.Id, ContactId = contact.Id, TokenHash = [1, 2, 3],
+            RequestId = request.Id, ContactId = contact.Id, TokenHash = [1, 2, 3],
             TokenExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
             DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
             SentAt = DateTimeOffset.UtcNow, Items = [fileItem, fieldItem],
         };
-        loan.Invites.Add(invite);
+        request.Invites.Add(invite);
         var blobName = $"invites/{invite.Id}/{Guid.NewGuid()}";
         var content = "%PDF-1.4 hello"u8.ToArray();
         _blobs.Put(blobName, content, "application/pdf");
         db.Contacts.Add(contact);
-        db.Loans.Add(loan);
+        db.Requests.Add(request);
         db.StoredFiles.Add(new StoredFile
         {
             RequestItemId = fileItem.Id, BlobName = blobName, OriginalFileName = "scan.pdf",
@@ -98,7 +98,7 @@ public class GdprTests : StaffTestBase
     public async Task Export_downloads_a_zip_with_the_json_and_the_files_and_is_audited()
     {
         var seeded = await SeedAsync();
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
         var response = await client.GetAsync(Url(seeded.ContactId, "export"));
 
@@ -118,7 +118,7 @@ public class GdprTests : StaffTestBase
         var root = json.RootElement;
         root.GetProperty("contact").GetProperty("email").GetString().Should().Be("pat@example.com");
         var invite = root.GetProperty("invites").EnumerateArray().Single();
-        invite.GetProperty("loanReference").GetString().Should().Be("LN-7");
+        invite.GetProperty("requestReference").GetString().Should().Be("LN-7");
         var items = invite.GetProperty("items").EnumerateArray().ToList();
         items.Select(i => i.GetProperty("fieldValue").GetString()).Should().Contain("7");
         items.Select(i => i.GetProperty("partyNote").GetString()).Should().Contain("my private note");
@@ -138,8 +138,8 @@ public class GdprTests : StaffTestBase
         var auditor = await ClientForAsync("auditor@example.com", [StaffRoles.Auditor]);
         (await auditor.GetAsync(Url(seeded.ContactId, "export"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var officer = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
-        (await officer.GetAsync(Url(Guid.NewGuid(), "export"))).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var requester = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
+        (await requester.GetAsync(Url(Guid.NewGuid(), "export"))).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await NewClient().GetAsync(Url(seeded.ContactId, "export"))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -149,9 +149,9 @@ public class GdprTests : StaffTestBase
     public async Task Erase_is_admin_only()
     {
         var seeded = await SeedAsync();
-        var officer = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var requester = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
-        var response = await officer.PostAsJsonAsync(Url(seeded.ContactId, "erase"), new { confirm = true });
+        var response = await requester.PostAsJsonAsync(Url(seeded.ContactId, "erase"), new { confirm = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await DbAsync(db => db.Contacts.SingleAsync(c => c.Id == seeded.ContactId))).ErasedAt.Should().BeNull();

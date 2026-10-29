@@ -69,7 +69,7 @@ describe("GdprPanel", () => {
       Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }),
     );
     const { calls } = mockApi({
-      ...signedIn(["LoanOfficer"]),
+      ...signedIn(["Requester"]),
       "GET /api/contacts/c1": () => jsonResponse(200, ann),
       "GET /api/gdpr/contacts/c1/export": () =>
         new Response("zip", { status: 200 }),

@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import type { Role } from '../auth/AuthContext';
 import { jsonResponse, mockApi, meBody, renderApp, resetSession, tokens } from '../test-utils';
-import { LoanDetailPage } from './LoanDetailPage';
-import type { Invite, InviteItem, Loan } from './loans';
+import { RequestDetailPage } from './RequestDetailPage';
+import type { Invite, InviteItem, Request } from './requests';
 
 afterEach(resetSession);
 
@@ -52,10 +52,10 @@ const fieldItem: InviteItem = {
   files: [],
 };
 
-function loanWith(items: InviteItem[]): Loan {
+function requestWith(items: InviteItem[]): Request {
   const invite: Invite = {
     id: 'i1',
-    loanId: 'l1',
+    requestId: 'l1',
     contactId: 'c1',
     partyName: 'Ann Lee',
     partyEmail: 'ann@example.com',
@@ -74,7 +74,7 @@ function loanWith(items: InviteItem[]): Loan {
     reference: 'LN-1',
     name: 'Acme',
     amount: 10,
-    loanType: 'SBA',
+    requestType: 'SBA',
     status: 'Submitted',
     createdAt: '2027-01-05T10:00:00Z',
     completedAt: null,
@@ -82,29 +82,29 @@ function loanWith(items: InviteItem[]): Loan {
   };
 }
 
-function setup(roles: Role[], loan: Loan, extra: Record<string, () => Response> = {}) {
+function setup(roles: Role[], request: Request, extra: Record<string, () => Response> = {}) {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
   const mock = mockApi({
     'POST /api/auth/refresh': () => jsonResponse(200, tokens),
     'GET /api/me': () => jsonResponse(200, meBody(roles)),
-    'GET /api/loans/l1': () => jsonResponse(200, loan),
+    'GET /api/requests/l1': () => jsonResponse(200, request),
     'GET /api/contacts?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
     'GET /api/templates?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
-    'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 25 }),
+    'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 25 }),
     ...extra,
   });
   renderApp(
     <Routes>
-      <Route path="/loans/:id" element={<LoanDetailPage />} />
+      <Route path="/requests/:id" element={<RequestDetailPage />} />
     </Routes>,
-    '/loans/l1',
+    '/requests/l1',
   );
   return mock;
 }
 
 describe('item review', () => {
   it('shows each item with its status, answer and files', async () => {
-    setup(['LoanOfficer'], loanWith([pdfItem, fieldItem]));
+    setup(['Requester'], requestWith([pdfItem, fieldItem]));
 
     const items = await screen.findByRole('list', { name: 'Items for Ann Lee' });
 
@@ -114,7 +114,7 @@ describe('item review', () => {
   });
 
   it('approves an item in one click', async () => {
-    const { calls } = setup(['LoanOfficer'], loanWith([pdfItem]), {
+    const { calls } = setup(['Requester'], requestWith([pdfItem]), {
       'POST /api/items/it1/approve': () => jsonResponse(200, { itemId: 'it1', itemStatus: 'Approved' }),
     });
     const user = userEvent.setup();
@@ -125,7 +125,7 @@ describe('item review', () => {
   });
 
   it('requires a reason before sending a rejection', async () => {
-    const { calls } = setup(['LoanOfficer'], loanWith([pdfItem]), {
+    const { calls } = setup(['Requester'], requestWith([pdfItem]), {
       'POST /api/items/it1/reject': () => jsonResponse(200, { itemId: 'it1', itemStatus: 'Rejected' }),
     });
     const user = userEvent.setup();
@@ -143,7 +143,7 @@ describe('item review', () => {
   });
 
   it('shows the API error when a rejection fails', async () => {
-    setup(['LoanOfficer'], loanWith([pdfItem]), {
+    setup(['Requester'], requestWith([pdfItem]), {
       'POST /api/items/it1/reject': () =>
         jsonResponse(502, { title: 'Bad Gateway', detail: 'The party could not be emailed, so the item was not rejected.' }),
     });
@@ -157,7 +157,7 @@ describe('item review', () => {
   });
 
   it('previews a PDF inline and an image as an image', async () => {
-    const { calls } = setup(['LoanOfficer'], loanWith([pdfItem, imageItem]), {
+    const { calls } = setup(['Requester'], requestWith([pdfItem, imageItem]), {
       'GET /api/files/f1/preview-url': () =>
         jsonResponse(200, { url: 'https://blob/f1?sp=r', expiresAt: '2027-01-01T00:05:00Z', fileName: 'x', contentType: 'application/pdf' }),
       'GET /api/files/f2/preview-url': () =>
@@ -175,7 +175,7 @@ describe('item review', () => {
   });
 
   it('shows the rejection reason on a rejected item and offers no approve', async () => {
-    setup(['Admin'], loanWith([{ ...pdfItem, status: 'Rejected', rejectionReason: 'Blurry' }]));
+    setup(['Admin'], requestWith([{ ...pdfItem, status: 'Rejected', rejectionReason: 'Blurry' }]));
 
     expect(await screen.findByText('Rejected: Blurry')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Approve/ })).not.toBeInTheDocument();

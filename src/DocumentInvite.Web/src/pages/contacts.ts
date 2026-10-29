@@ -29,4 +29,4 @@ export interface Contact {
 export type ContactPage = PagedResponse<Contact>;
 
 /** Roles that may create and edit contacts. */
-export const CONTACT_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;
+export const CONTACT_WRITER_ROLES = ['Admin', 'Requester'] as const;

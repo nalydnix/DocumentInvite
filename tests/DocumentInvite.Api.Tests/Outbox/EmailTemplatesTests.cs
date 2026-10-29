@@ -11,11 +11,11 @@ public class EmailTemplatesTests
 
     public static TheoryData<string, EmailContent> AllTemplates => new()
     {
-        { "invite", EmailTemplates.Invite(new("Pat", "Loan 42", Link, Due, 3)) },
-        { "reminder", EmailTemplates.Reminder(new("Pat", "Loan 42", Link, Due, 2)) },
-        { "overdue", EmailTemplates.Overdue(new("Pat", "Loan 42", Link, Due, 2)) },
-        { "rejected", EmailTemplates.ItemRejected(new("Pat", "Loan 42", "Bank statement", "Page 2 is missing", Link)) },
-        { "message", EmailTemplates.NewMessage(new("Pat", "Loan 42", Link)) },
+        { "invite", EmailTemplates.Invite(new("Pat", "Request 42", Link, Due, 3)) },
+        { "reminder", EmailTemplates.Reminder(new("Pat", "Request 42", Link, Due, 2)) },
+        { "overdue", EmailTemplates.Overdue(new("Pat", "Request 42", Link, Due, 2)) },
+        { "rejected", EmailTemplates.ItemRejected(new("Pat", "Request 42", "Bank statement", "Page 2 is missing", Link)) },
+        { "message", EmailTemplates.NewMessage(new("Pat", "Request 42", Link)) },
     };
 
     [Theory]
@@ -23,7 +23,7 @@ public class EmailTemplatesTests
     public void Every_email_has_html_and_text_bodies_with_the_portal_link(string name, EmailContent content)
     {
         content.Subject.Should().NotBeNullOrWhiteSpace(name);
-        content.Subject.Should().Contain("Loan 42");
+        content.Subject.Should().Contain("Request 42");
         content.Html.Should().Contain($"href=\"{Link}\"").And.Contain("Hello Pat,");
         content.Text.Should().Contain(Link).And.Contain("Hello Pat,");
         content.Html.Should().NotContain("<script");
@@ -32,7 +32,7 @@ public class EmailTemplatesTests
     [Fact]
     public void Invite_mentions_the_item_count_and_due_date()
     {
-        var content = EmailTemplates.Invite(new("Pat", "Loan 42", Link, Due, 3));
+        var content = EmailTemplates.Invite(new("Pat", "Request 42", Link, Due, 3));
 
         content.Text.Should().Contain("3 items").And.Contain("5 March 2027");
     }
@@ -40,16 +40,16 @@ public class EmailTemplatesTests
     [Fact]
     public void Reminder_and_overdue_use_the_outstanding_count()
     {
-        EmailTemplates.Reminder(new("Pat", "Loan 42", Link, Due, 1)).Text.Should().Contain("1 item is still outstanding");
-        EmailTemplates.Overdue(new("Pat", "Loan 42", Link, Due, 4)).Text
+        EmailTemplates.Reminder(new("Pat", "Request 42", Link, Due, 1)).Text.Should().Contain("1 item is still outstanding");
+        EmailTemplates.Overdue(new("Pat", "Request 42", Link, Due, 4)).Text
             .Should().Contain("were due on 5 March 2027").And.Contain("4 items");
-        EmailTemplates.Overdue(new("Pat", "Loan 42", Link, Due, 4)).Subject.Should().StartWith("Overdue");
+        EmailTemplates.Overdue(new("Pat", "Request 42", Link, Due, 4)).Subject.Should().StartWith("Overdue");
     }
 
     [Fact]
     public void Rejected_email_names_the_item_and_the_reason()
     {
-        var content = EmailTemplates.ItemRejected(new("Pat", "Loan 42", "Bank statement", "Page 2 is missing", Link));
+        var content = EmailTemplates.ItemRejected(new("Pat", "Request 42", "Bank statement", "Page 2 is missing", Link));
 
         content.Subject.Should().Contain("Bank statement");
         content.Html.Should().Contain("Page 2 is missing");
@@ -59,7 +59,7 @@ public class EmailTemplatesTests
     [Fact]
     public void New_message_email_does_not_carry_message_content()
     {
-        var content = EmailTemplates.NewMessage(new("Pat", "Loan 42", Link));
+        var content = EmailTemplates.NewMessage(new("Pat", "Request 42", Link));
 
         content.Text.Should().Contain("only in your secure portal");
     }
@@ -68,7 +68,7 @@ public class EmailTemplatesTests
     public void Values_are_html_encoded_and_subjects_have_no_line_breaks()
     {
         var content = EmailTemplates.ItemRejected(new(
-            "<b>Pat</b>", "Loan\r\nBcc: evil@example.com", "A & B", "<img src=x onerror=alert(1)>", Link));
+            "<b>Pat</b>", "Request\r\nBcc: evil@example.com", "A & B", "<img src=x onerror=alert(1)>", Link));
 
         content.Html.Should().NotContain("<b>Pat</b>").And.NotContain("<img").And.Contain("&lt;img");
         content.Html.Should().Contain("A &amp; B");
@@ -81,7 +81,7 @@ public class EmailTemplatesTests
     [InlineData("")]
     public void Links_must_be_absolute_http_urls(string link)
     {
-        var act = () => EmailTemplates.NewMessage(new("Pat", "Loan 42", link));
+        var act = () => EmailTemplates.NewMessage(new("Pat", "Request 42", link));
 
         act.Should().Throw<ArgumentException>();
     }
@@ -108,15 +108,15 @@ public class EmailTemplatesTests
     }
 
     [Fact]
-    public void A_party_message_email_for_staff_encodes_names_and_links_to_the_loan_without_the_message_text()
+    public void A_party_message_email_for_staff_encodes_names_and_links_to_the_request_without_the_message_text()
     {
-        var loanId = Guid.NewGuid();
+        var requestId = Guid.NewGuid();
         var builder = new PortalLinkBuilder(Options.Create(new PortalOptions { BaseUrl = "https://app.example.com/" }));
         var content = EmailTemplates.NewPartyMessage(new(
-            "Sam", "Loan 42", "Pat <b>O'Neil</b>", builder.ForLoan(loanId)));
+            "Sam", "Request 42", "Pat <b>O'Neil</b>", builder.ForRequest(requestId)));
 
-        content.Html.Should().Contain($"href=\"https://app.example.com/loans/{loanId}\"").And.NotContain("<b>");
-        content.Text.Should().Contain($"https://app.example.com/loans/{loanId}").And.Contain("You are receiving this");
-        content.Subject.Should().Contain("Loan 42");
+        content.Html.Should().Contain($"href=\"https://app.example.com/requests/{requestId}\"").And.NotContain("<b>");
+        content.Text.Should().Contain($"https://app.example.com/requests/{requestId}").And.Contain("You are receiving this");
+        content.Subject.Should().Contain("Request 42");
     }
 }

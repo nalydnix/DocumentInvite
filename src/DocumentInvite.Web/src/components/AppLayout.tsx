@@ -12,10 +12,10 @@ interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { to: '/loans', label: 'Loans', roles: ['Admin', 'LoanOfficer'] },
-  { to: '/templates', label: 'Templates', roles: ['Admin', 'LoanOfficer'] },
-  { to: '/outbox', label: 'Outbox', roles: ['Admin', 'LoanOfficer'] },
-  { to: '/contacts', label: 'Contacts', roles: ['Admin', 'LoanOfficer'] },
+  { to: '/requests', label: 'Requests', roles: ['Admin', 'Requester'] },
+  { to: '/templates', label: 'Templates', roles: ['Admin', 'Requester'] },
+  { to: '/outbox', label: 'Outbox', roles: ['Admin', 'Requester'] },
+  { to: '/contacts', label: 'Contacts', roles: ['Admin', 'Requester'] },
   { to: '/users', label: 'Users', roles: ['Admin'] },
   { to: '/audit', label: 'Audit log', roles: ['Admin', 'Auditor'] },
   { to: '/settings', label: 'Settings', roles: ['Admin'] },
@@ -32,7 +32,7 @@ function UnreadBadge({ count }: { count: number }) {
 }
 
 function NavLinks({ user, onNavigate }: { user: CurrentUser; onNavigate?: () => void }) {
-  const outboxUnread = useUnreadOutboxCount(hasAnyRole(user, ['Admin', 'LoanOfficer']));
+  const outboxUnread = useUnreadOutboxCount(hasAnyRole(user, ['Admin', 'Requester']));
   return (
     <nav aria-label="Main" className="flex flex-col gap-1">
       {navItems

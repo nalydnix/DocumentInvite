@@ -23,7 +23,7 @@ public sealed partial class AuditLog(AppDbContext db, IRequestContext context, T
 
         if (target.Type is null || !TypePattern().IsMatch(target.Type))
         {
-            throw new ArgumentException("Audit target types are lower-case identifiers such as 'loan'.", nameof(target));
+            throw new ArgumentException("Audit target types are lower-case identifiers such as 'request'.", nameof(target));
         }
 
         var auditEvent = new AuditEvent

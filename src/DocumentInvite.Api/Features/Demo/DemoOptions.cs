@@ -7,7 +7,7 @@ public sealed class DemoOptions
 
     public bool Enabled { get; set; }
 
-    /// <summary>Keyed by role name: Admin, LoanOfficer, Auditor.</summary>
+    /// <summary>Keyed by role name: Admin, Requester, Auditor.</summary>
     public Dictionary<string, DemoAccountOptions> Accounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 

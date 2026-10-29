@@ -4,14 +4,14 @@ using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Invites;
 using FluentValidation;
 
-namespace DocumentInvite.Api.Features.Loans;
+namespace DocumentInvite.Api.Features.Requests;
 
-public sealed record LoanSummaryResponse(
+public sealed record RequestSummaryResponse(
     Guid Id,
     string Reference,
     string Name,
     decimal Amount,
-    string LoanType,
+    string RequestType,
     CollectionStatus Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
@@ -22,54 +22,54 @@ public sealed record LoanSummaryResponse(
     DateOnly? DueDate,
     bool IsOverdue);
 
-public sealed record LoanResponse(
+public sealed record RequestResponse(
     Guid Id,
     string Reference,
     string Name,
     decimal Amount,
-    string LoanType,
+    string RequestType,
     CollectionStatus Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
     IReadOnlyList<InviteResponse> Invites);
 
-/// <summary>Query-string parameters for the loan list.</summary>
-public sealed record LoanListQuery(
+/// <summary>Query-string parameters for the request list.</summary>
+public sealed record RequestListQuery(
     string? Search,
     CollectionStatus? Status,
     int Page = PagingDefaults.DefaultPage,
     int PageSize = PagingDefaults.DefaultPageSize) : IPagedQuery;
 
-public sealed record ReopenLoanRequest(string? Reason);
+public sealed record ReopenRequestRequest(string? Reason);
 
-public sealed record LoanRequest(string? Reference, string? Name, decimal? Amount, string? LoanType);
+public sealed record SaveRequestRequest(string? Reference, string? Name, decimal? Amount, string? RequestType);
 
-public sealed class LoanListQueryValidator : AbstractValidator<LoanListQuery>
+public sealed class RequestListQueryValidator : AbstractValidator<RequestListQuery>
 {
-    public LoanListQueryValidator()
+    public RequestListQueryValidator()
     {
-        Include(new PagedQueryValidator<LoanListQuery>());
+        Include(new PagedQueryValidator<RequestListQuery>());
         RuleFor(x => x.Search).MaximumLength(200);
         RuleFor(x => x.Status).IsInEnum().When(x => x.Status is not null);
     }
 }
 
-public sealed class ReopenLoanRequestValidator : AbstractValidator<ReopenLoanRequest>
+public sealed class ReopenRequestRequestValidator : AbstractValidator<ReopenRequestRequest>
 {
     public const int MaxReasonLength = 1000;
 
-    public ReopenLoanRequestValidator()
+    public ReopenRequestRequestValidator()
     {
-        RuleFor(x => x.Reason).NotEmpty().WithMessage("A reason is required to reopen a loan.")
+        RuleFor(x => x.Reason).NotEmpty().WithMessage("A reason is required to reopen a request.")
             .MaximumLength(MaxReasonLength);
     }
 }
 
-public sealed partial class LoanRequestValidator : AbstractValidator<LoanRequest>
+public sealed partial class SaveRequestRequestValidator : AbstractValidator<SaveRequestRequest>
 {
     public const decimal MaxAmount = 1_000_000_000_000m;
 
-    public LoanRequestValidator()
+    public SaveRequestRequestValidator()
     {
         RuleFor(x => x.Reference).NotEmpty().MaximumLength(50)
             .Matches(ReferencePattern())
@@ -77,7 +77,7 @@ public sealed partial class LoanRequestValidator : AbstractValidator<LoanRequest
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Amount).NotNull().GreaterThan(0).LessThanOrEqualTo(MaxAmount)
             .PrecisionScale(18, 2, false);
-        RuleFor(x => x.LoanType).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.RequestType).NotEmpty().MaximumLength(100);
     }
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._-]*$")]

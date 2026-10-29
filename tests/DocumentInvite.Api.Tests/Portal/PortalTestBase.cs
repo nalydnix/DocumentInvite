@@ -8,7 +8,7 @@ using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Contacts;
 using DocumentInvite.Api.Features.Files;
 using DocumentInvite.Api.Features.Invites;
-using DocumentInvite.Api.Features.Loans;
+using DocumentInvite.Api.Features.Requests;
 using DocumentInvite.Api.Features.Portal;
 using DocumentInvite.Api.Infrastructure.Blob;
 using DocumentInvite.Api.Infrastructure.Persistence;
@@ -47,20 +47,20 @@ public abstract partial class PortalTestBase : StaffTestBase
 
     private int _counter;
 
-    protected async Task<HttpClient> OfficerAsync() => await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+    protected async Task<HttpClient> RequesterAsync() => await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
-    /// <summary>Creates a loan with one invite (a single file, a multi file, a number and a yes/no item) and returns the emailed token.</summary>
-    protected async Task<Party> SendInviteAsync(HttpClient officer, string? password = null, string? lastName = null)
+    /// <summary>Creates a request with one invite (a single file, a multi file, a number and a yes/no item) and returns the emailed token.</summary>
+    protected async Task<Party> SendInviteAsync(HttpClient requester, string? password = null, string? lastName = null)
     {
         var n = Interlocked.Increment(ref _counter);
-        var contact = await officer.PostAsJsonAsync("/api/contacts",
+        var contact = await requester.PostAsJsonAsync("/api/contacts",
             new ContactRequest($"Ann{n}", lastName ?? $"Lee{n}", $"ann{n}@example.com", null, PartyType.Borrower));
         contact.StatusCode.Should().Be(HttpStatusCode.Created);
         var contactId = (await contact.Content.ReadFromJsonAsync<ContactResponse>())!.Id;
 
-        var loan = await officer.PostAsJsonAsync("/api/loans", new LoanRequest($"LN-{n:0000}", $"Loan {n}", 100m, "SBA 7(a)"));
-        loan.StatusCode.Should().Be(HttpStatusCode.Created);
-        var loanId = (await loan.Content.ReadFromJsonAsync<LoanResponse>())!.Id;
+        var request = await requester.PostAsJsonAsync("/api/requests", new SaveRequestRequest($"LN-{n:0000}", $"Request {n}", 100m, "SBA 7(a)"));
+        request.StatusCode.Should().Be(HttpStatusCode.Created);
+        var requestId = (await request.Content.ReadFromJsonAsync<RequestResponse>())!.Id;
 
         var items = new List<InviteItemRequest>
         {
@@ -69,7 +69,7 @@ public abstract partial class PortalTestBase : StaffTestBase
             new("Years in business", ItemKind.FormField, "", false, FieldType.Number, true),
             new("Owns property", ItemKind.FormField, "", false, FieldType.YesNo, false),
         };
-        var response = await officer.PostAsJsonAsync($"/api/loans/{loanId}/invites",
+        var response = await requester.PostAsJsonAsync($"/api/requests/{requestId}/invites",
             new SendInvitesRequest([new SendPartyRequest(
                 contactId, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)), null, items, password)]));
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
@@ -123,10 +123,10 @@ public abstract partial class PortalTestBase : StaffTestBase
         return await db.Invites.AsNoTracking().Include(i => i.Items).SingleAsync(i => i.Id == id);
     }
 
-    protected async Task<Loan> LoanRowAsync(Guid id)
+    protected async Task<Request> RequestRowAsync(Guid id)
     {
         using var scope = Factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Loans.AsNoTracking().SingleAsync(l => l.Id == id);
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Requests.AsNoTracking().SingleAsync(l => l.Id == id);
     }
 
     protected async Task<List<StoredFile>> FilesAsync(Guid itemId)

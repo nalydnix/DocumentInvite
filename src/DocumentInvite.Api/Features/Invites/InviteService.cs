@@ -42,22 +42,22 @@ public sealed class InviteService(
         return InviteResult<InviteResponse>.Ok(ToResponse(invite, contact, files));
     }
 
-    /// <summary>Creates one invite per party, emails each party its link, and updates the loan status.</summary>
+    /// <summary>Creates one invite per party, emails each party its link, and updates the request status.</summary>
     public async Task<InviteResult<IReadOnlyList<InviteResponse>>> SendAsync(
-        Guid loanId, SendInvitesRequest request, CancellationToken ct)
+        Guid requestId, SendInvitesRequest input, CancellationToken ct)
     {
-        var loan = await LoadLoanAsync(db.Loans.Where(l => l.Id == loanId), ct);
-        if (loan is null)
+        var request = await LoadRequestAsync(db.Requests.Where(l => l.Id == requestId), ct);
+        if (request is null)
         {
             return InviteResult<IReadOnlyList<InviteResponse>>.Missing();
         }
 
-        if (loan.CompletedAt is not null)
+        if (request.CompletedAt is not null)
         {
-            return InviteResult<IReadOnlyList<InviteResponse>>.Refused(LoanLock.Message);
+            return InviteResult<IReadOnlyList<InviteResponse>>.Refused(RequestLock.Message);
         }
 
-        var parties = request.Parties!;
+        var parties = input.Parties!;
         var now = clock.GetUtcNow();
         var today = DateOnly.FromDateTime(now.UtcDateTime);
 
@@ -85,10 +85,10 @@ public sealed class InviteService(
                     $"parties[{index}].dueDate", "The due date cannot be in the past.");
             }
 
-            if (loan.Invites.Any(i => i.ContactId == contact.Id))
+            if (request.Invites.Any(i => i.ContactId == contact.Id))
             {
                 return InviteResult<IReadOnlyList<InviteResponse>>.Refused(
-                    "A party that already has an invite on this loan cannot be invited again. Reissue the link instead.");
+                    "A party that already has an invite on this request cannot be invited again. Reissue the link instead.");
             }
         }
 
@@ -101,7 +101,7 @@ public sealed class InviteService(
             var token = PortalTokens.Generate();
             var invite = new Invite
             {
-                LoanId = loan.Id,
+                RequestId = request.Id,
                 ContactId = party.ContactId!.Value,
                 DueDate = party.DueDate!.Value,
                 ReminderIntervalDays = party.ReminderIntervalDays ?? defaultInterval,
@@ -124,12 +124,12 @@ public sealed class InviteService(
                 invite.PasswordHash = hasher.HashPassword(invite, party.Password);
             }
 
-            loan.Invites.Add(invite);
+            request.Invites.Add(invite);
             db.Invites.Add(invite);
             created.Add((invite, contacts[invite.ContactId], token));
         }
 
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
 
         try
         {
@@ -139,10 +139,10 @@ public sealed class InviteService(
                 await audit.RecordAsync(
                     "invite.sent", new AuditTarget("invite", invite.Id),
                     AuditDetails.Empty
-                        .WithId("loanId", loan.Id)
+                        .WithId("requestId", request.Id)
                         .WithId("contactId", contact.Id)
                         .WithCount("itemCount", invite.Items.Count), ct);
-                await SendEmailAsync(invite, contact, loan, token, ct);
+                await SendEmailAsync(invite, contact, request, token, ct);
             }
 
             await transaction.CommitAsync(ct);
@@ -150,12 +150,12 @@ public sealed class InviteService(
         catch (DbUpdateConcurrencyException)
         {
             return InviteResult<IReadOnlyList<InviteResponse>>.Refused(
-                "The loan was changed by someone else. Reload it and try again.");
+                "The request was changed by someone else. Reload it and try again.");
         }
         catch (DbUpdateException ex) when (Database.IsUniqueViolation(ex))
         {
             return InviteResult<IReadOnlyList<InviteResponse>>.Refused(
-                "A party that already has an invite on this loan cannot be invited again. Reload and try again.");
+                "A party that already has an invite on this request cannot be invited again. Reload and try again.");
         }
 
         return InviteResult<IReadOnlyList<InviteResponse>>.Ok(
@@ -164,16 +164,16 @@ public sealed class InviteService(
 
     public async Task<InviteResult<InviteResponse>> RevokeAsync(Guid inviteId, CancellationToken ct)
     {
-        var loan = await LoadLoanAsync(db.Loans.Where(l => l.Invites.Any(i => i.Id == inviteId)), ct);
-        var invite = loan?.Invites.SingleOrDefault(i => i.Id == inviteId);
-        if (loan is null || invite is null)
+        var request = await LoadRequestAsync(db.Requests.Where(l => l.Invites.Any(i => i.Id == inviteId)), ct);
+        var invite = request?.Invites.SingleOrDefault(i => i.Id == inviteId);
+        if (request is null || invite is null)
         {
             return InviteResult<InviteResponse>.Missing();
         }
 
-        if (loan.CompletedAt is not null)
+        if (request.CompletedAt is not null)
         {
-            return InviteResult<InviteResponse>.Refused(LoanLock.Message);
+            return InviteResult<InviteResponse>.Refused(RequestLock.Message);
         }
 
         if (invite.RevokedAt is not null)
@@ -183,14 +183,14 @@ public sealed class InviteService(
 
         var now = clock.GetUtcNow();
         invite.RevokedAt = now;
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
 
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await audit.RecordAsync(
                 "invite.revoked", new AuditTarget("invite", invite.Id),
-                AuditDetails.Empty.WithId("loanId", loan.Id), ct);
+                AuditDetails.Empty.WithId("requestId", request.Id), ct);
             await transaction.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
@@ -208,16 +208,16 @@ public sealed class InviteService(
     /// </summary>
     public async Task<InviteResult<InviteResponse>> ReissueAsync(Guid inviteId, CancellationToken ct)
     {
-        var loan = await LoadLoanAsync(db.Loans.Where(l => l.Invites.Any(i => i.Id == inviteId)), ct);
-        var invite = loan?.Invites.SingleOrDefault(i => i.Id == inviteId);
-        if (loan is null || invite is null)
+        var request = await LoadRequestAsync(db.Requests.Where(l => l.Invites.Any(i => i.Id == inviteId)), ct);
+        var invite = request?.Invites.SingleOrDefault(i => i.Id == inviteId);
+        if (request is null || invite is null)
         {
             return InviteResult<InviteResponse>.Missing();
         }
 
-        if (loan.CompletedAt is not null)
+        if (request.CompletedAt is not null)
         {
-            return InviteResult<InviteResponse>.Refused(LoanLock.Message);
+            return InviteResult<InviteResponse>.Refused(RequestLock.Message);
         }
 
         if (invite.Status == CollectionStatus.Completed)
@@ -239,15 +239,15 @@ public sealed class InviteService(
         invite.RevokedAt = null;
         invite.SentAt = now;
         invite.LastReminderAt = null;
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
 
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await audit.RecordAsync(
                 "invite.reissued", new AuditTarget("invite", invite.Id),
-                AuditDetails.Empty.WithId("loanId", loan.Id), ct);
-            await SendEmailAsync(invite, contact, loan, token, ct);
+                AuditDetails.Empty.WithId("requestId", request.Id), ct);
+            await SendEmailAsync(invite, contact, request, token, ct);
             await transaction.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
@@ -263,14 +263,14 @@ public sealed class InviteService(
         new DateTimeOffset(dueDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
             .AddDays(LinkValidDaysAfterDueDate);
 
-    private Task SendEmailAsync(Invite invite, Contact contact, Loan loan, string token, CancellationToken ct)
+    private Task SendEmailAsync(Invite invite, Contact contact, Request request, string token, CancellationToken ct)
     {
         var content = EmailTemplates.Invite(new InviteEmailModel(
-            contact.FirstName, loan.Name, links.For(token), invite.DueDate, invite.Items.Count));
+            contact.FirstName, request.Name, links.For(token), invite.DueDate, invite.Items.Count));
         return email.SendAsync(EmailMessage.From(contact.Email, content), ct);
     }
 
-    private static Task<Loan?> LoadLoanAsync(IQueryable<Loan> query, CancellationToken ct) =>
+    private static Task<Request?> LoadRequestAsync(IQueryable<Request> query, CancellationToken ct) =>
         query.Include(l => l.Invites).ThenInclude(i => i.Items).AsSplitQuery().SingleOrDefaultAsync(ct);
 
     /// <summary>Loads the ready files of the given items, grouped by item id, for staff views.</summary>
@@ -282,7 +282,7 @@ public sealed class InviteService(
 
     internal static InviteResponse ToResponse(
         Invite invite, Contact contact, ILookup<Guid, StoredFile>? files = null) => new(
-        invite.Id, invite.LoanId, invite.ContactId,
+        invite.Id, invite.RequestId, invite.ContactId,
         $"{contact.FirstName} {contact.LastName}", contact.Email, contact.PartyType,
         invite.DueDate, invite.ReminderIntervalDays, invite.SentAt, invite.TokenExpiresAt, invite.RevokedAt,
         invite.Status, invite.PasswordHash is not null,

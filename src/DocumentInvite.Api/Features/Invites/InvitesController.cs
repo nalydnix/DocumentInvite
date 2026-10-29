@@ -13,11 +13,11 @@ public class InvitesController(InviteService service) : ControllerBase
     public async Task<IActionResult> Get(Guid id, CancellationToken ct) => ToActionResult(await service.GetAsync(id, ct));
 
     /// <summary>Creates one invite per party and emails each party its link.</summary>
-    [HttpPost("api/loans/{loanId:guid}/invites")]
+    [HttpPost("api/requests/{requestId:guid}/invites")]
     [Authorize(Policy = AuthPolicies.RequireStaff)]
-    public async Task<IActionResult> Send(Guid loanId, SendInvitesRequest request, CancellationToken ct)
+    public async Task<IActionResult> Send(Guid requestId, SendInvitesRequest input, CancellationToken ct)
     {
-        var result = await service.SendAsync(loanId, request, ct);
+        var result = await service.SendAsync(requestId, input, ct);
         return result.Value is { } invites ? StatusCode(StatusCodes.Status201Created, invites) : ToActionResult(result);
     }
 

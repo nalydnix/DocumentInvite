@@ -15,12 +15,12 @@ export const STATUS_LABELS: Record<CollectionStatus, string> = {
 
 export const STATUSES = Object.keys(STATUS_LABELS) as CollectionStatus[];
 
-export interface LoanSummary {
+export interface RequestSummary {
   id: string;
   reference: string;
   name: string;
   amount: number;
-  loanType: string;
+  requestType: string;
   status: CollectionStatus;
   createdAt: string;
   completedAt: string | null;
@@ -70,7 +70,7 @@ export interface ReadUrl {
 
 export interface Invite {
   id: string;
-  loanId: string;
+  requestId: string;
   contactId: string;
   partyName: string;
   partyEmail: string;
@@ -85,13 +85,13 @@ export interface Invite {
   items: InviteItem[];
 }
 
-export interface Loan
-  extends Omit<LoanSummary, 'partyCount' | 'itemsTotal' | 'itemsApproved' | 'percentComplete' | 'dueDate' | 'isOverdue'> {
+export interface Request
+  extends Omit<RequestSummary, 'partyCount' | 'itemsTotal' | 'itemsApproved' | 'percentComplete' | 'dueDate' | 'isOverdue'> {
   invites: Invite[];
 }
 
-/** Roles that may create loans and send, revoke and reissue invites. */
-export const LOAN_WRITER_ROLES = ['Admin', 'LoanOfficer'] as const;
+/** Roles that may create requests and send, revoke and reissue invites. */
+export const REQUEST_WRITER_ROLES = ['Admin', 'Requester'] as const;
 
 export function formatAmount(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);

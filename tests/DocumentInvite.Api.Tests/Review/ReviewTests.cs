@@ -7,7 +7,7 @@ using DocumentInvite.Api.Domain;
 using DocumentInvite.Api.Features.Auth;
 using DocumentInvite.Api.Features.Files;
 using DocumentInvite.Api.Features.Invites;
-using DocumentInvite.Api.Features.Loans;
+using DocumentInvite.Api.Features.Requests;
 using DocumentInvite.Api.Features.Outbox;
 using DocumentInvite.Api.Features.Review;
 using DocumentInvite.Api.Infrastructure.Blob;
@@ -52,7 +52,7 @@ public class ReviewTests : StaffTestBase
         await base.DisposeAsync();
     }
 
-    private sealed record Seeded(Guid LoanId, Guid InviteId, Guid FileItemId, Guid FieldItemId, Guid FileId, byte[] TokenHash);
+    private sealed record Seeded(Guid RequestId, Guid InviteId, Guid FileItemId, Guid FieldItemId, Guid FileId, byte[] TokenHash);
 
     private async Task<Seeded> SeedAsync(
         RequestItemStatus fileStatus = RequestItemStatus.Submitted, string reference = "LN-7",
@@ -61,7 +61,7 @@ public class ReviewTests : StaffTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var contact = new Contact { FirstName = "Pat", LastName = "Doe", Email = $"{Guid.NewGuid():N}@example.com" };
-        var loan = new Loan { Reference = reference, Name = "Acme loan", LoanType = "SBA", Amount = 5, CreatedAt = DateTimeOffset.UtcNow };
+        var request = new Request { Reference = reference, Name = "Acme request", RequestType = "SBA", Amount = 5, CreatedAt = DateTimeOffset.UtcNow };
         var fileItem = new RequestItem
         {
             Name = "Bank statements", Kind = ItemKind.FileUpload, Instructions = "x", IsRequired = true, Status = fileStatus,
@@ -74,7 +74,7 @@ public class ReviewTests : StaffTestBase
         var hash = RandomNumberGenerator.GetBytes(32);
         var invite = new Invite
         {
-            LoanId = loan.Id,
+            RequestId = request.Id,
             ContactId = contact.Id,
             TokenHash = hash,
             TokenExpiresAt = tokenExpiresAt ?? DateTimeOffset.UtcNow.AddDays(30),
@@ -83,7 +83,7 @@ public class ReviewTests : StaffTestBase
             RevokedAt = revoked ? DateTimeOffset.UtcNow : null,
             Items = [fileItem, fieldItem],
         };
-        loan.Invites.Add(invite);
+        request.Invites.Add(invite);
         var file = new StoredFile
         {
             RequestItemId = fileItem.Id,
@@ -98,14 +98,14 @@ public class ReviewTests : StaffTestBase
             UploadedAt = DateTimeOffset.UtcNow,
         };
         db.Contacts.Add(contact);
-        db.Loans.Add(loan);
+        db.Requests.Add(request);
         db.StoredFiles.Add(file);
-        StatusRecalculator.Apply(loan);
+        StatusRecalculator.Apply(request);
         await db.SaveChangesAsync();
-        return new Seeded(loan.Id, invite.Id, fileItem.Id, fieldItem.Id, file.Id, hash);
+        return new Seeded(request.Id, invite.Id, fileItem.Id, fieldItem.Id, file.Id, hash);
     }
 
-    private async Task<HttpClient> OfficerAsync() => await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+    private async Task<HttpClient> RequesterAsync() => await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
     private async Task<T> DbAsync<T>(Func<AppDbContext, Task<T>> query)
     {
@@ -119,35 +119,35 @@ public class ReviewTests : StaffTestBase
     public async Task Approve_marks_the_item_approved_recalculates_statuses_and_audits_ids_only()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        var response = await officer.PostAsync($"/api/items/{seed.FileItemId}/approve", null);
+        var response = await requester.PostAsync($"/api/items/{seed.FileItemId}/approve", null);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = (await response.Content.ReadFromJsonAsync<ReviewResponse>())!;
         body.ItemStatus.Should().Be(RequestItemStatus.Approved);
         body.InviteStatus.Should().Be(CollectionStatus.Submitted);
 
-        var approveField = await officer.PostAsync($"/api/items/{seed.FieldItemId}/approve", null);
+        var approveField = await requester.PostAsync($"/api/items/{seed.FieldItemId}/approve", null);
         var last = (await approveField.Content.ReadFromJsonAsync<ReviewResponse>())!;
         last.InviteStatus.Should().Be(CollectionStatus.Completed);
-        last.LoanStatus.Should().Be(CollectionStatus.ReadyToComplete);
-        (await DbAsync(db => db.Loans.AsNoTracking().SingleAsync(l => l.Id == seed.LoanId))).CompletedAt.Should().BeNull();
+        last.RequestStatus.Should().Be(CollectionStatus.ReadyToComplete);
+        (await DbAsync(db => db.Requests.AsNoTracking().SingleAsync(l => l.Id == seed.RequestId))).CompletedAt.Should().BeNull();
 
         var events = (await AuditEventsAsync()).Where(e => e.Action == "item.approved").ToList();
         events.Should().HaveCount(2);
         events[0].TargetId.Should().Be(seed.FileItemId);
-        events[0].DetailsJson.Should().Contain(seed.LoanId.ToString()).And.NotContain("Bank");
+        events[0].DetailsJson.Should().Contain(seed.RequestId.ToString()).And.NotContain("Bank");
     }
 
     [Fact]
     public async Task Approve_refuses_an_item_that_is_not_submitted_and_unknown_items_are_404()
     {
         var seed = await SeedAsync(RequestItemStatus.Outstanding);
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        (await officer.PostAsync($"/api/items/{seed.FileItemId}/approve", null)).StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await officer.PostAsync($"/api/items/{Guid.NewGuid()}/approve", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await requester.PostAsync($"/api/items/{seed.FileItemId}/approve", null)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await requester.PostAsync($"/api/items/{Guid.NewGuid()}/approve", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ---- reject ----
@@ -156,11 +156,11 @@ public class ReviewTests : StaffTestBase
     public async Task Reject_requires_a_reason()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
         foreach (var reason in new[] { "", "   ", null })
         {
-            var response = await officer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest(reason));
+            var response = await requester.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest(reason));
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
@@ -172,9 +172,9 @@ public class ReviewTests : StaffTestBase
     public async Task Reject_reopens_the_item_adds_a_system_message_emails_the_party_and_audits()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        var response = await officer.PostAsJsonAsync(
+        var response = await requester.PostAsJsonAsync(
             $"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Statement is blurry"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -207,9 +207,9 @@ public class ReviewTests : StaffTestBase
     {
         var seed = await SeedAsync(
             due: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-60)), tokenExpiresAt: DateTimeOffset.UtcNow.AddDays(-5));
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        var response = await officer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Blurry"));
+        var response = await requester.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Blurry"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var email = await DbAsync(db => db.OutboxEmails.AsNoTracking().SingleAsync());
@@ -224,10 +224,10 @@ public class ReviewTests : StaffTestBase
     public async Task Reject_is_rolled_back_when_the_email_cannot_be_delivered()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
         SwitchableEmailSender.Fail = true;
 
-        var response = await officer.PostAsJsonAsync(
+        var response = await requester.PostAsJsonAsync(
             $"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Blurry"));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
@@ -243,9 +243,9 @@ public class ReviewTests : StaffTestBase
     public async Task Reject_refuses_a_revoked_invite()
     {
         var seed = await SeedAsync(revoked: true);
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        var response = await officer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("No"));
+        var response = await requester.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("No"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -268,10 +268,10 @@ public class ReviewTests : StaffTestBase
     public async Task Preview_and_download_return_short_lived_urls_and_are_audited()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        var preview = await officer.GetAsync($"/api/files/{seed.FileId}/preview-url");
-        var download = await officer.GetAsync($"/api/files/{seed.FileId}/download-url");
+        var preview = await requester.GetAsync($"/api/files/{seed.FileId}/preview-url");
+        var download = await requester.GetAsync($"/api/files/{seed.FileId}/download-url");
 
         preview.StatusCode.Should().Be(HttpStatusCode.OK);
         download.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -283,25 +283,25 @@ public class ReviewTests : StaffTestBase
         var actions = (await AuditEventsAsync()).Select(e => e.Action).ToList();
         actions.Should().Contain(["file.previewed", "file.downloaded"]);
 
-        (await officer.GetAsync($"/api/files/{Guid.NewGuid()}/preview-url")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await requester.GetAsync($"/api/files/{Guid.NewGuid()}/preview-url")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ---- dashboard and detail ----
 
     [Fact]
-    public async Task Loan_detail_shows_rejection_reason_and_ready_files_for_each_item()
+    public async Task Request_detail_shows_rejection_reason_and_ready_files_for_each_item()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
-        await officer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Blurry"));
+        var requester = await RequesterAsync();
+        await requester.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest("Blurry"));
 
-        var loan = (await officer.GetFromJsonAsync<LoanResponse>($"/api/loans/{seed.LoanId}"))!;
+        var request = (await requester.GetFromJsonAsync<RequestResponse>($"/api/requests/{seed.RequestId}"))!;
 
-        var fileItem = loan.Invites.Single().Items.Single(i => i.Id == seed.FileItemId);
+        var fileItem = request.Invites.Single().Items.Single(i => i.Id == seed.FileItemId);
         fileItem.Status.Should().Be(RequestItemStatus.Rejected);
         fileItem.RejectionReason.Should().Be("Blurry");
         fileItem.Files.Should().ContainSingle().Which.Id.Should().Be(seed.FileId);
-        loan.Invites.Single().Items.Single(i => i.Id == seed.FieldItemId).FieldValue.Should().Be("7");
+        request.Invites.Single().Items.Single(i => i.Id == seed.FieldItemId).FieldValue.Should().Be("7");
     }
 
     [Fact]
@@ -316,9 +316,9 @@ public class ReviewTests : StaffTestBase
                 s => s.SetProperty(i => i.Status, RequestItemStatus.Approved));
             return 0;
         });
-        var officer = await ClientForAsync("v@example.com", [StaffRoles.LoanOfficer]);
+        var requester = await ClientForAsync("v@example.com", [StaffRoles.Requester]);
 
-        var page = (await officer.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans"))!;
+        var page = (await requester.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests"))!;
 
         var over = page.Items.Single(l => l.Reference == "LN-OVER");
         over.IsOverdue.Should().BeTrue();
@@ -330,17 +330,17 @@ public class ReviewTests : StaffTestBase
         complete.IsOverdue.Should().BeFalse("nothing is left for the party to provide");
         complete.PercentComplete.Should().Be(100);
 
-        var search = (await officer.GetFromJsonAsync<PagedResponse<LoanSummaryResponse>>("/api/loans?search=OVER"))!;
-        search.Items.Should().ContainSingle().Which.Id.Should().Be(overdue.LoanId);
+        var search = (await requester.GetFromJsonAsync<PagedResponse<RequestSummaryResponse>>("/api/requests?search=OVER"))!;
+        search.Items.Should().ContainSingle().Which.Id.Should().Be(overdue.RequestId);
     }
 
     [Fact]
     public async Task Reject_response_is_json_problem_details_on_validation_error()
     {
         var seed = await SeedAsync();
-        var officer = await OfficerAsync();
+        var requester = await RequesterAsync();
 
-        var response = await officer.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest(""));
+        var response = await requester.PostAsJsonAsync($"/api/items/{seed.FileItemId}/reject", new RejectItemRequest(""));
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         doc.RootElement.GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().Contain("reason");

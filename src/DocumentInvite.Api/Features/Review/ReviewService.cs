@@ -28,15 +28,15 @@ public sealed class ReviewService(
 
     public async Task<ReviewResult> ApproveAsync(Guid itemId, CancellationToken ct)
     {
-        var (loan, invite, item) = await LoadAsync(itemId, ct);
+        var (request, invite, item) = await LoadAsync(itemId, ct);
         if (item is null)
         {
             return ReviewResult.Missing();
         }
 
-        if (loan!.CompletedAt is not null)
+        if (request!.CompletedAt is not null)
         {
-            return ReviewResult.Refused(LoanLock.Message);
+            return ReviewResult.Refused(RequestLock.Message);
         }
 
         if (item.Status != RequestItemStatus.Submitted)
@@ -48,12 +48,12 @@ public sealed class ReviewService(
         item.Status = RequestItemStatus.Approved;
         item.RejectionReason = null;
         Stamp(item, now);
-        StatusRecalculator.Apply(loan!);
+        StatusRecalculator.Apply(request!);
 
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
-            await audit.RecordAsync("item.approved", new AuditTarget("item", item.Id), Details(loan!, invite!), ct);
+            await audit.RecordAsync("item.approved", new AuditTarget("item", item.Id), Details(request!, invite!), ct);
             await transaction.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
@@ -61,7 +61,7 @@ public sealed class ReviewService(
             return ReviewResult.Refused(Stale);
         }
 
-        return ReviewResult.Ok(ToResponse(loan!, invite!, item));
+        return ReviewResult.Ok(ToResponse(request!, invite!, item));
     }
 
     /// <summary>
@@ -71,15 +71,15 @@ public sealed class ReviewService(
     /// </summary>
     public async Task<ReviewResult> RejectAsync(Guid itemId, string reason, CancellationToken ct)
     {
-        var (loan, invite, item) = await LoadAsync(itemId, ct);
+        var (request, invite, item) = await LoadAsync(itemId, ct);
         if (item is null)
         {
             return ReviewResult.Missing();
         }
 
-        if (loan!.CompletedAt is not null)
+        if (request!.CompletedAt is not null)
         {
-            return ReviewResult.Refused(LoanLock.Message);
+            return ReviewResult.Refused(RequestLock.Message);
         }
 
         if (item.Status is not (RequestItemStatus.Submitted or RequestItemStatus.Approved))
@@ -103,7 +103,7 @@ public sealed class ReviewService(
         item.Status = RequestItemStatus.Rejected;
         item.RejectionReason = reason;
         Stamp(item, now);
-        StatusRecalculator.Apply(loan!);
+        StatusRecalculator.Apply(request!);
 
         var token = PortalTokens.Generate();
         invite.TokenHash = PortalTokens.Hash(token);
@@ -125,12 +125,12 @@ public sealed class ReviewService(
         });
 
         var content = EmailTemplates.ItemRejected(new ItemRejectedEmailModel(
-            contact.FirstName, loan!.Name, item.Name, reason, links.For(token)));
+            contact.FirstName, request!.Name, item.Name, reason, links.For(token)));
 
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
-            await audit.RecordAsync("item.rejected", new AuditTarget("item", item.Id), Details(loan, invite), ct);
+            await audit.RecordAsync("item.rejected", new AuditTarget("item", item.Id), Details(request, invite), ct);
             var sent = await email.SendAsync(EmailMessage.From(contact.Email, content), ct);
             if (!sent.Delivered)
             {
@@ -145,17 +145,17 @@ public sealed class ReviewService(
             return ReviewResult.Refused(Stale);
         }
 
-        return ReviewResult.Ok(ToResponse(loan, invite, item));
+        return ReviewResult.Ok(ToResponse(request, invite, item));
     }
 
-    private async Task<(Loan? Loan, Invite? Invite, RequestItem? Item)> LoadAsync(Guid itemId, CancellationToken ct)
+    private async Task<(Request? Request, Invite? Invite, RequestItem? Item)> LoadAsync(Guid itemId, CancellationToken ct)
     {
-        var loan = await db.Loans
+        var request = await db.Requests
             .Include(l => l.Invites).ThenInclude(i => i.Items)
             .AsSplitQuery()
             .SingleOrDefaultAsync(l => l.Invites.Any(i => i.Items.Any(x => x.Id == itemId)), ct);
-        var invite = loan?.Invites.Single(i => i.Items.Any(x => x.Id == itemId));
-        return (loan, invite, invite?.Items.Single(x => x.Id == itemId));
+        var invite = request?.Invites.Single(i => i.Items.Any(x => x.Id == itemId));
+        return (request, invite, invite?.Items.Single(x => x.Id == itemId));
     }
 
     private void Stamp(RequestItem item, DateTimeOffset now)
@@ -164,9 +164,9 @@ public sealed class ReviewService(
         item.ReviewedAt = now;
     }
 
-    private static AuditDetails Details(Loan loan, Invite invite) =>
-        AuditDetails.Empty.WithId("loanId", loan.Id).WithId("inviteId", invite.Id);
+    private static AuditDetails Details(Request request, Invite invite) =>
+        AuditDetails.Empty.WithId("requestId", request.Id).WithId("inviteId", invite.Id);
 
-    private static ReviewResponse ToResponse(Loan loan, Invite invite, RequestItem item) => new(
-        item.Id, item.Status, item.RejectionReason, item.ReviewedAt!.Value, invite.Id, invite.Status, loan.Id, loan.Status);
+    private static ReviewResponse ToResponse(Request request, Invite invite, RequestItem item) => new(
+        item.Id, item.Status, item.RejectionReason, item.ReviewedAt!.Value, invite.Id, invite.Status, request.Id, request.Status);
 }

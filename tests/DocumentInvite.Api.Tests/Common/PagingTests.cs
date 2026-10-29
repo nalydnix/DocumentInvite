@@ -68,7 +68,7 @@ public class PagingApiTests : StaffTestBase
     [InlineData("pageSize=101")]
     public async Task Invalid_paging_returns_a_validation_problem(string query)
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
 
         var response = await client.GetAsync($"/api/contacts?{query}");
 
@@ -79,7 +79,7 @@ public class PagingApiTests : StaffTestBase
     [Fact]
     public async Task Pages_never_overlap_or_skip_rows_even_with_identical_sort_keys()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         var created = new List<Guid>();
         for (var i = 0; i < 7; i++)
         {
@@ -104,7 +104,7 @@ public class PagingApiTests : StaffTestBase
     [Fact]
     public async Task A_page_past_the_end_is_empty_but_reports_the_total()
     {
-        var client = await ClientForAsync("lo@example.com", [StaffRoles.LoanOfficer]);
+        var client = await ClientForAsync("lo@example.com", [StaffRoles.Requester]);
         await client.PostAsJsonAsync("/api/contacts", new ContactRequest("A", "B", "ab@example.com", null, PartyType.Borrower));
 
         var body = (await client.GetFromJsonAsync<PagedResponse<ContactResponse>>("/api/contacts?page=9&pageSize=5"))!;

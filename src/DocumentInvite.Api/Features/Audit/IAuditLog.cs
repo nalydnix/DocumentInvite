@@ -1,6 +1,6 @@
 namespace DocumentInvite.Api.Features.Audit;
 
-/// <summary>The thing an audit event is about, for example <c>("loan", loanId)</c>.</summary>
+/// <summary>The thing an audit event is about, for example <c>("request", requestId)</c>.</summary>
 public readonly record struct AuditTarget(string Type, Guid? Id = null);
 
 /// <summary>The only way to write audit events.</summary>

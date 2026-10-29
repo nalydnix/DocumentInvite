@@ -24,8 +24,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_valid_token_gives_a_session_and_the_open_is_audited_with_the_party_as_actor()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
 
         var session = await SessionAsync(party.Token, acceptPrivacy: false);
         var invite = await JsonOf(await session.GetAsync("/api/portal/invite"));
@@ -44,10 +44,10 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Unknown_revoked_and_expired_tokens_show_a_friendly_error()
     {
-        var officer = await OfficerAsync();
-        var revoked = await SendInviteAsync(officer);
-        var expired = await SendInviteAsync(officer);
-        (await officer.PostAsync($"/api/invites/{revoked.Invite.Id}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var requester = await RequesterAsync();
+        var revoked = await SendInviteAsync(requester);
+        var expired = await SendInviteAsync(requester);
+        (await requester.PostAsync($"/api/invites/{revoked.Invite.Id}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.OK);
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -72,8 +72,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_portal_password_is_stored_hashed_and_required_for_a_session()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer, password: "correct-horse");
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester, password: "correct-horse");
 
         party.Invite.HasPassword.Should().BeTrue();
         var stored = (await InviteRowAsync(party.Invite.Id)).PasswordHash;
@@ -100,14 +100,14 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_portal_password_that_is_too_short_is_refused_when_sending()
     {
-        var officer = await OfficerAsync();
-        var contact = await officer.PostAsJsonAsync("/api/contacts",
+        var requester = await RequesterAsync();
+        var contact = await requester.PostAsJsonAsync("/api/contacts",
             new DocumentInvite.Api.Features.Contacts.ContactRequest("Ann", "Lee", "short@example.com", null, PartyType.Borrower));
         var contactId = (await contact.Content.ReadFromJsonAsync<DocumentInvite.Api.Features.Contacts.ContactResponse>())!.Id;
-        var loan = await officer.PostAsJsonAsync("/api/loans", new DocumentInvite.Api.Features.Loans.LoanRequest("LN-9", "Loan", 1m, "SBA"));
-        var loanId = (await loan.Content.ReadFromJsonAsync<DocumentInvite.Api.Features.Loans.LoanResponse>())!.Id;
+        var request = await requester.PostAsJsonAsync("/api/requests", new DocumentInvite.Api.Features.Requests.SaveRequestRequest("LN-9", "Request", 1m, "SBA"));
+        var requestId = (await request.Content.ReadFromJsonAsync<DocumentInvite.Api.Features.Requests.RequestResponse>())!.Id;
 
-        var response = await officer.PostAsJsonAsync($"/api/loans/{loanId}/invites", new SendInvitesRequest([new SendPartyRequest(
+        var response = await requester.PostAsJsonAsync($"/api/requests/{requestId}/invites", new SendInvitesRequest([new SendPartyRequest(
             contactId, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5)), null,
             [new InviteItemRequest("Tax", ItemKind.FileUpload, "", false, null, true)], "short")]));
 
@@ -117,8 +117,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Portal_responses_do_not_leak_the_token_through_referrer_or_caches()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
 
         var response = await ExchangeAsync(party.Token);
         response.Headers.GetValues("Referrer-Policy").Should().ContainSingle().Which.Should().Be("no-referrer");
@@ -131,10 +131,10 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Portal_endpoints_accept_only_a_portal_session()
     {
-        var officer = await OfficerAsync();
-        await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        await SendInviteAsync(requester);
 
-        (await officer.GetAsync("/api/portal/invite")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await requester.GetAsync("/api/portal/invite")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await NewClient().GetAsync("/api/portal/invite")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         var forged = NewClient();
@@ -145,11 +145,11 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_portal_session_cannot_call_staff_endpoints()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
-        (await session.GetAsync("/api/loans")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await session.GetAsync("/api/requests")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await session.GetAsync($"/api/invites/{party.Invite.Id}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await session.GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -157,15 +157,15 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_session_ends_when_the_invite_is_revoked_or_the_link_is_reissued()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
         (await session.GetAsync("/api/portal/invite")).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await officer.PostAsync($"/api/invites/{party.Invite.Id}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await requester.PostAsync($"/api/invites/{party.Invite.Id}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.OK);
         (await session.GetAsync("/api/portal/invite")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        (await officer.PostAsync($"/api/invites/{party.Invite.Id}/reissue", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await requester.PostAsync($"/api/invites/{party.Invite.Id}/reissue", null)).StatusCode.Should().Be(HttpStatusCode.OK);
         (await session.GetAsync("/api/portal/invite")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         var fresh = await SessionAsync(await TokenForAsync(party.ContactId));
@@ -177,8 +177,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Nothing_can_be_uploaded_or_saved_before_the_privacy_notice_is_accepted()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token, acceptPrivacy: false);
 
         var slot = await session.PostAsJsonAsync($"/api/portal/items/{party.FileItemId}/upload-slot",
@@ -208,8 +208,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task An_upload_goes_through_a_slot_and_completion_and_is_audited_with_the_party_as_actor()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
         var response = await UploadAsync(session, party.FileItemId, "My Tax Return.pdf");
@@ -237,8 +237,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_single_file_item_keeps_only_the_latest_file_and_a_multi_file_item_keeps_all()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
         (await UploadAsync(session, party.FileItemId, "one.pdf")).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -259,8 +259,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Unsupported_oversized_and_missing_uploads_are_refused_with_friendly_codes()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
         var url = $"/api/portal/items/{party.FileItemId}/upload-slot";
 
@@ -281,8 +281,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_form_item_does_not_take_files_and_a_file_item_does_not_take_a_field_value()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
         (await session.PostAsJsonAsync($"/api/portal/items/{party.NumberItemId}/upload-slot",
@@ -296,8 +296,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Form_fields_are_validated_by_type_saved_and_audited_without_the_value()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
         var bad = await session.PutAsJsonAsync($"/api/portal/items/{party.NumberItemId}/field", new { value = "twelve" });
@@ -331,8 +331,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Notes_are_saved_trimmed_and_audited_without_the_text()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
         (await session.PutAsJsonAsync($"/api/portal/items/{party.FileItemId}/note", new { note = "  Sent by post too  " }))
@@ -354,8 +354,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task Submitting_every_required_item_moves_the_invite_to_submitted()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
 
         (await UploadAsync(session, party.FileItemId)).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -364,14 +364,14 @@ public class PortalTests : PortalTestBase
         (await session.PutAsJsonAsync($"/api/portal/items/{party.NumberItemId}/field", new { value = "4" }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
         (await InviteRowAsync(party.Invite.Id)).Status.Should().Be(CollectionStatus.Submitted);
-        (await LoanRowAsync(party.Invite.LoanId)).Status.Should().Be(CollectionStatus.Submitted);
+        (await RequestRowAsync(party.Invite.RequestId)).Status.Should().Be(CollectionStatus.Submitted);
     }
 
     [Fact]
     public async Task A_rejected_item_shows_its_reason_and_resubmitting_reopens_it_for_review()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
         (await UploadAsync(session, party.FileItemId)).StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -397,8 +397,8 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task An_approved_item_is_locked()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer);
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester);
         var session = await SessionAsync(party.Token);
         using (var scope = Factory.Services.CreateScope())
         {
@@ -421,9 +421,9 @@ public class PortalTests : PortalTestBase
     [Fact]
     public async Task A_session_never_reaches_another_invites_data()
     {
-        var officer = await OfficerAsync();
-        var alice = await SendInviteAsync(officer, lastName: "Alice");
-        var bob = await SendInviteAsync(officer, lastName: "Bob");
+        var requester = await RequesterAsync();
+        var alice = await SendInviteAsync(requester, lastName: "Alice");
+        var bob = await SendInviteAsync(requester, lastName: "Bob");
         var aliceSession = await SessionAsync(alice.Token);
         var bobSession = await SessionAsync(bob.Token);
 
@@ -465,8 +465,8 @@ public class PortalRateLimitTests : PortalTestBase
     [Fact]
     public async Task Token_exchange_attempts_are_rate_limited()
     {
-        var officer = await OfficerAsync();
-        var party = await SendInviteAsync(officer, password: "correct-horse");
+        var requester = await RequesterAsync();
+        var party = await SendInviteAsync(requester, password: "correct-horse");
 
         for (var i = 0; i < 3; i++)
         {

@@ -16,7 +16,7 @@ public sealed class RejectItemRequestValidator : AbstractValidator<RejectItemReq
     }
 }
 
-/// <summary>The item after review, plus the recalculated invite and loan status.</summary>
+/// <summary>The item after review, plus the recalculated invite and request status.</summary>
 public sealed record ReviewResponse(
     Guid ItemId,
     RequestItemStatus ItemStatus,
@@ -24,5 +24,5 @@ public sealed record ReviewResponse(
     DateTimeOffset ReviewedAt,
     Guid InviteId,
     CollectionStatus InviteStatus,
-    Guid LoanId,
-    CollectionStatus LoanStatus);
+    Guid RequestId,
+    CollectionStatus RequestStatus);

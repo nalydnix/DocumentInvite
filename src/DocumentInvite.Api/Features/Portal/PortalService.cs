@@ -20,7 +20,7 @@ public enum PortalFailure
     NotFound,
     PrivacyRequired,
     ItemLocked,
-    LoanLocked,
+    RequestLocked,
     Invalid,
     File,
 }
@@ -92,8 +92,8 @@ public sealed class PortalService(
 
         await RetryAsync(async () =>
         {
-            var loan = await LoadLoanAsync(inviteId, ct);
-            var current = loan.Invites.Single(i => i.Id == inviteId);
+            var request = await LoadRequestAsync(inviteId, ct);
+            var current = request.Invites.Single(i => i.Id == inviteId);
             var now = clock.GetUtcNow();
             if (rehash)
             {
@@ -103,13 +103,13 @@ public sealed class PortalService(
             if (current.PortalOpenedAt is null)
             {
                 current.PortalOpenedAt = now;
-                StatusRecalculator.Apply(loan);
+                StatusRecalculator.Apply(request);
             }
 
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await audit.RecordAsync(
                 "portal.opened", new AuditTarget("invite", inviteId),
-                AuditDetails.Empty.WithId("loanId", loan.Id), ct);
+                AuditDetails.Empty.WithId("requestId", request.Id), ct);
             await transaction.CommitAsync(ct);
             return true;
         });
@@ -129,7 +129,7 @@ public sealed class PortalService(
             return PortalResult<PortalInviteResponse>.Fail(PortalFailure.NotFound);
         }
 
-        var loanName = await db.Loans.AsNoTracking().Where(l => l.Id == invite.LoanId).Select(l => l.Name).SingleAsync(ct);
+        var requestName = await db.Requests.AsNoTracking().Where(l => l.Id == invite.RequestId).Select(l => l.Name).SingleAsync(ct);
         var firstName = await db.Contacts.AsNoTracking().Where(c => c.Id == invite.ContactId).Select(c => c.FirstName).SingleAsync(ct);
 
         var itemIds = invite.Items.Select(i => i.Id).ToList();
@@ -145,7 +145,7 @@ public sealed class PortalService(
             .ToList();
 
         return PortalResult<PortalInviteResponse>.Ok(new PortalInviteResponse(
-            loanName, firstName, invite.DueDate, invite.Status, invite.PrivacyAcceptedAt is not null,
+            requestName, firstName, invite.DueDate, invite.Status, invite.PrivacyAcceptedAt is not null,
             items.Count, items.Count(i => i.Status is RequestItemStatus.Submitted or RequestItemStatus.Approved), items));
     }
 
@@ -169,7 +169,7 @@ public sealed class PortalService(
                 await using var transaction = await db.Database.BeginTransactionAsync(ct);
                 await audit.RecordAsync(
                     "portal.privacy_accepted", new AuditTarget("invite", inviteId),
-                    AuditDetails.Empty.WithId("loanId", current.LoanId), ct);
+                    AuditDetails.Empty.WithId("requestId", current.RequestId), ct);
                 await transaction.CommitAsync(ct);
             }
 
@@ -180,7 +180,7 @@ public sealed class PortalService(
     // ---- uploads ----
 
     public async Task<PortalResult<UploadSlot>> CreateUploadSlotAsync(
-        Guid inviteId, Guid itemId, UploadSlotRequest request, CancellationToken ct)
+        Guid inviteId, Guid itemId, UploadSlotRequest input, CancellationToken ct)
     {
         var guard = await GuardAsync(inviteId, itemId, ItemKind.FileUpload, ct);
         if (guard is not null)
@@ -188,7 +188,7 @@ public sealed class PortalService(
             return PortalResult<UploadSlot>.Fail(guard.Value);
         }
 
-        var slot = await slots.CreateAsync(itemId, request.FileName!, request.ContentType!, request.SizeBytes!.Value, ct);
+        var slot = await slots.CreateAsync(itemId, input.FileName!, input.ContentType!, input.SizeBytes!.Value, ct);
         return slot.Succeeded ? PortalResult<UploadSlot>.Ok(slot.Value!) : PortalResult<UploadSlot>.FromFile(slot.Error!.Value);
     }
 
@@ -216,8 +216,8 @@ public sealed class PortalService(
         db.ChangeTracker.Clear();
         return await RetryAsync(async () =>
         {
-            var loan = await LoadLoanAsync(inviteId, ct);
-            var item = loan.Invites.Single(i => i.Id == inviteId).Items.Single(i => i.Id == itemId);
+            var request = await LoadRequestAsync(inviteId, ct);
+            var item = request.Invites.Single(i => i.Id == inviteId).Items.Single(i => i.Id == itemId);
             var file = await db.StoredFiles.SingleAsync(f => f.Id == fileId, ct);
 
             if (!item.AllowMultiple)
@@ -232,7 +232,7 @@ public sealed class PortalService(
             }
 
             MarkSubmitted(item);
-            StatusRecalculator.Apply(loan);
+            StatusRecalculator.Apply(request);
             await db.SaveChangesAsync(ct);
             return PortalResult<PortalFileResponse>.Ok(
                 new PortalFileResponse(file.Id, file.OriginalFileName, file.SizeBytes, file.UploadedAt));
@@ -260,8 +260,8 @@ public sealed class PortalService(
 
         return await RetryAsync(async () =>
         {
-            var loan = await LoadLoanAsync(inviteId, ct);
-            var item = loan.Invites.Single(i => i.Id == inviteId).Items.Single(i => i.Id == itemId);
+            var request = await LoadRequestAsync(inviteId, ct);
+            var item = request.Invites.Single(i => i.Id == inviteId).Items.Single(i => i.Id == itemId);
             if (item.Status == RequestItemStatus.Approved)
             {
                 return PortalResult<PortalItemResponse>.Fail(PortalFailure.ItemLocked);
@@ -277,7 +277,7 @@ public sealed class PortalService(
                 item.Status = RequestItemStatus.Outstanding;
             }
 
-            StatusRecalculator.Apply(loan);
+            StatusRecalculator.Apply(request);
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await audit.RecordAsync(
                 "portal.field_saved", new AuditTarget("request_item", itemId),
@@ -329,11 +329,11 @@ public sealed class PortalService(
             return PortalFailure.NotFound;
         }
 
-        var loanCompleted = await db.Loans.AsNoTracking()
+        var requestCompleted = await db.Requests.AsNoTracking()
             .AnyAsync(l => l.CompletedAt != null && l.Invites.Any(i => i.Id == inviteId), ct);
-        if (loanCompleted)
+        if (requestCompleted)
         {
-            return PortalFailure.LoanLocked;
+            return PortalFailure.RequestLocked;
         }
 
         var privacyAccepted = await db.Invites.AsNoTracking()
@@ -355,13 +355,13 @@ public sealed class PortalService(
         }
     }
 
-    private Task<Loan> LoadLoanAsync(Guid inviteId, CancellationToken ct) =>
-        db.Loans.Where(l => l.Invites.Any(i => i.Id == inviteId))
+    private Task<Request> LoadRequestAsync(Guid inviteId, CancellationToken ct) =>
+        db.Requests.Where(l => l.Invites.Any(i => i.Id == inviteId))
             .Include(l => l.Invites).ThenInclude(i => i.Items)
             .AsSplitQuery()
             .SingleAsync(ct);
 
-    /// <summary>Another request changed the same invite or loan: reload and apply the change again.</summary>
+    /// <summary>Another request changed the same invite or request: reload and apply the change again.</summary>
     private async Task<T> RetryAsync<T>(Func<Task<T>> operation)
     {
         for (var attempt = 1; ; attempt++)

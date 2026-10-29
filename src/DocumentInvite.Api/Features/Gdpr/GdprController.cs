@@ -22,7 +22,7 @@ public class GdprController(GdprService service) : ControllerBase
 
     [HttpPost("erase")]
     [Authorize(Policy = AuthPolicies.RequireAdmin)]
-    public async Task<IActionResult> Erase(Guid id, EraseContactRequest request, CancellationToken ct)
+    public async Task<IActionResult> Erase(Guid id, EraseContactRequest input, CancellationToken ct)
     {
         var result = await service.EraseAsync(id, ct);
         if (result.NotFound)
@@ -42,7 +42,7 @@ public class GdprController(GdprService service) : ControllerBase
 [Authorize(Policy = AuthPolicies.RequireAdmin)]
 public class RetentionController(RetentionService service) : ControllerBase
 {
-    /// <summary>Lists the loans and file counts a run would purge. Changes nothing.</summary>
+    /// <summary>Lists the requests and file counts a run would purge. Changes nothing.</summary>
     [HttpGet("preview")]
     public async Task<RetentionPreviewResponse> Preview([FromQuery] PageQuery query, CancellationToken ct) =>
         await service.PreviewAsync(query, ct);

@@ -14,9 +14,9 @@ using Microsoft.Extensions.Options;
 namespace DocumentInvite.Api.Features.Demo;
 
 /// <summary>
-/// Creates the demo accounts, sample contacts and three loans (just sent, partly uploaded with one
+/// Creates the demo accounts, sample contacts and three requests (just sent, partly uploaded with one
 /// rejected item, fully approved) with sample PDFs and the matching audit events. Seeding is
-/// idempotent: accounts that exist are left alone and the loans are created only when missing.
+/// idempotent: accounts that exist are left alone and the requests are created only when missing.
 /// Every seeded event is attributed to the System actor.
 /// </summary>
 public sealed class DemoSeeder(
@@ -41,12 +41,12 @@ public sealed class DemoSeeder(
         string Name, ItemKind Kind, RequestItemStatus Status, bool Required = true, bool Multiple = false,
         FieldType? Field = null, string? Value = null, string? Reason = null, string Instructions = "");
 
-    private sealed record LoanSpec(
-        string Reference, string Name, decimal Amount, string LoanType,
+    private sealed record RequestSpec(
+        string Reference, string Name, decimal Amount, string RequestType,
         string FirstName, string LastName, string Email, PartyType PartyType,
         int SentDaysAgo, int DueInDays, ItemSpec[] Items);
 
-    private static readonly LoanSpec[] Loans =
+    private static readonly RequestSpec[] Requests =
     [
         new(SentReference, "Harbor Bakery acquisition", 850_000m, "SBA 7(a)",
             "Maria", "Alvarez", "maria.alvarez@example.com", PartyType.Borrower, 0, 14,
@@ -90,7 +90,7 @@ public sealed class DemoSeeder(
 
         var audit = new AuditLog(db, new SystemRequestContext(), clock);
         await SeedUsersAsync(audit, ct);
-        await SeedLoansAsync(audit, [], ct);
+        await SeedRequestsAsync(audit, [], ct);
     }
 
     /// <summary>The demo accounts. An existing account is never changed.</summary>
@@ -136,13 +136,13 @@ public sealed class DemoSeeder(
     }
 
     /// <summary>
-    /// Creates the three sample loans when none of them exist. Blobs are written first and their
+    /// Creates the three sample requests when none of them exist. Blobs are written first and their
     /// names are added to <paramref name="written"/>, so a caller that rolls back its own transaction can remove them. Joins
     /// the caller's transaction when one is open.
     /// </summary>
-    public async Task SeedLoansAsync(IAuditLog audit, List<string> written, CancellationToken ct)
+    public async Task SeedRequestsAsync(IAuditLog audit, List<string> written, CancellationToken ct)
     {
-        if (await db.Loans.AnyAsync(l => References.Contains(l.Reference), ct))
+        if (await db.Requests.AnyAsync(l => References.Contains(l.Reference), ct))
         {
             return;
         }
@@ -160,9 +160,9 @@ public sealed class DemoSeeder(
             : null;
         try
         {
-            foreach (var spec in Loans)
+            foreach (var spec in Requests)
             {
-                await SeedLoanAsync(spec, creator, now, today, audit, written, ct);
+                await SeedRequestAsync(spec, creator, now, today, audit, written, ct);
             }
 
             if (ownTransaction is not null)
@@ -204,8 +204,8 @@ public sealed class DemoSeeder(
         }
     }
 
-    private async Task SeedLoanAsync(
-        LoanSpec spec, Guid? creator, DateTimeOffset now, DateOnly today, IAuditLog audit, List<string> written, CancellationToken ct)
+    private async Task SeedRequestAsync(
+        RequestSpec spec, Guid? creator, DateTimeOffset now, DateOnly today, IAuditLog audit, List<string> written, CancellationToken ct)
     {
         var sentAt = now.AddDays(-spec.SentDaysAgo);
         var dueDate = today.AddDays(spec.DueInDays);
@@ -219,19 +219,19 @@ public sealed class DemoSeeder(
             PartyType = spec.PartyType,
             CreatedAt = sentAt,
         };
-        var loan = new Loan
+        var request = new Request
         {
             Reference = spec.Reference,
             Name = spec.Name,
             Amount = spec.Amount,
-            LoanType = spec.LoanType,
+            RequestType = spec.RequestType,
             CreatedBy = creator,
             CreatedAt = sentAt,
         };
         var started = spec.Items.Any(i => i.Status != RequestItemStatus.Outstanding);
         var invite = new Invite
         {
-            LoanId = loan.Id,
+            RequestId = request.Id,
             ContactId = contact.Id,
             DueDate = dueDate,
             ReminderIntervalDays = ReminderIntervalDays,
@@ -285,32 +285,32 @@ public sealed class DemoSeeder(
             }
         }
 
-        loan.Invites.Add(invite);
-        StatusRecalculator.Apply(loan);
+        request.Invites.Add(invite);
+        StatusRecalculator.Apply(request);
 
-        // The fully approved demo loan stays Ready to complete: completion is an explicit staff action.
+        // The fully approved demo request stays Ready to complete: completion is an explicit staff action.
 
         db.Contacts.Add(contact);
-        db.Loans.Add(loan);
+        db.Requests.Add(request);
         db.StoredFiles.AddRange(files);
         db.Messages.AddRange(messages);
         await db.SaveChangesAsync(ct);
 
-        await audit.RecordAsync("loan.created", new AuditTarget("loan", loan.Id), null, ct);
+        await audit.RecordAsync("request.created", new AuditTarget("request", request.Id), null, ct);
         await audit.RecordAsync(
             "invite.sent", new AuditTarget("invite", invite.Id),
-            AuditDetails.Empty.WithId("loanId", loan.Id).WithId("contactId", contact.Id).WithCount("itemCount", invite.Items.Count), ct);
+            AuditDetails.Empty.WithId("requestId", request.Id).WithId("contactId", contact.Id).WithCount("itemCount", invite.Items.Count), ct);
 
         var content = EmailTemplates.Invite(new InviteEmailModel(
-            contact.FirstName, loan.Name, links.For(token), invite.DueDate, invite.Items.Count));
+            contact.FirstName, request.Name, links.For(token), invite.DueDate, invite.Items.Count));
         await email.SendAsync(EmailMessage.From(contact.Email, content), ct);
 
         if (started)
         {
             await audit.RecordAsync(
-                "portal.opened", new AuditTarget("invite", invite.Id), AuditDetails.Empty.WithId("loanId", loan.Id), ct);
+                "portal.opened", new AuditTarget("invite", invite.Id), AuditDetails.Empty.WithId("requestId", request.Id), ct);
             await audit.RecordAsync(
-                "portal.privacy_accepted", new AuditTarget("invite", invite.Id), AuditDetails.Empty.WithId("loanId", loan.Id), ct);
+                "portal.privacy_accepted", new AuditTarget("invite", invite.Id), AuditDetails.Empty.WithId("requestId", request.Id), ct);
         }
 
         foreach (var file in files)
@@ -331,12 +331,12 @@ public sealed class DemoSeeder(
             await audit.RecordAsync(
                 item.Status == RequestItemStatus.Approved ? "item.approved" : "item.rejected",
                 new AuditTarget("item", item.Id),
-                AuditDetails.Empty.WithId("loanId", loan.Id).WithId("inviteId", invite.Id), ct);
+                AuditDetails.Empty.WithId("requestId", request.Id).WithId("inviteId", invite.Id), ct);
         }
     }
 
     private async Task<StoredFile> WriteFileAsync(
-        LoanSpec spec, Invite invite, RequestItem item, List<string> written, DateTimeOffset now, CancellationToken ct)
+        RequestSpec spec, Invite invite, RequestItem item, List<string> written, DateTimeOffset now, CancellationToken ct)
     {
         var fileId = Guid.NewGuid();
         var blobName = $"invites/{invite.Id}/{fileId:D}";

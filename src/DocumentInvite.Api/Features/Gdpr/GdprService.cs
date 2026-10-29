@@ -87,8 +87,8 @@ public sealed class GdprService(AppDbContext db, IBlobStore blobs, IAuditLog aud
             .Include(i => i.Items)
             .OrderBy(i => i.SentAt).ThenBy(i => i.Id)
             .ToListAsync(ct);
-        var loanIds = invites.Select(i => i.LoanId).Distinct().ToList();
-        var loans = await db.Loans.AsNoTracking().Where(l => loanIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct);
+        var requestIds = invites.Select(i => i.RequestId).Distinct().ToList();
+        var requests = await db.Requests.AsNoTracking().Where(l => requestIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct);
         var inviteIds = invites.Select(i => i.Id).ToList();
         var itemIds = invites.SelectMany(i => i.Items).Select(i => i.Id).ToList();
 
@@ -133,8 +133,8 @@ public sealed class GdprService(AppDbContext db, IBlobStore blobs, IAuditLog aud
                 contact.PartyType.ToString(), contact.IsPseudonymised, contact.ErasedAt, contact.CreatedAt),
             invites.Select(invite => new ExportedInvite(
                 invite.Id,
-                loans[invite.LoanId].Reference,
-                loans[invite.LoanId].Name,
+                requests[invite.RequestId].Reference,
+                requests[invite.RequestId].Name,
                 invite.DueDate,
                 invite.Status.ToString(),
                 invite.SentAt,

@@ -3,19 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import type { Role } from '../auth/AuthContext';
 import { jsonResponse, mockApi, meBody, renderApp, resetSession, tokens } from '../test-utils';
-import { LoanDetailPage } from './LoanDetailPage';
-import { LoanFormPage } from './LoanFormPage';
-import { LoansPage } from './LoansPage';
-import type { Invite, Loan, LoanSummary } from './loans';
+import { RequestDetailPage } from './RequestDetailPage';
+import { RequestFormPage } from './RequestFormPage';
+import { RequestsPage } from './RequestsPage';
+import type { Invite, Request, RequestSummary } from './requests';
 
 afterEach(resetSession);
 
-const summary: LoanSummary = {
+const summary: RequestSummary = {
   id: 'l1',
   reference: 'LN-1001',
   name: 'Acme acquisition',
   amount: 1250000,
-  loanType: 'SBA 7(a)',
+  requestType: 'SBA 7(a)',
   status: 'InProgress',
   createdAt: '2027-01-05T10:00:00Z',
   completedAt: null,
@@ -29,7 +29,7 @@ const summary: LoanSummary = {
 
 const annInvite: Invite = {
   id: 'i1',
-  loanId: 'l1',
+  requestId: 'l1',
   contactId: 'c1',
   partyName: 'Ann Lee',
   partyEmail: 'ann@example.com',
@@ -87,9 +87,9 @@ const annInvite: Invite = {
   ],
 };
 
-const loan: Loan = { ...summary, invites: [annInvite] };
+const request: Request = { ...summary, invites: [annInvite] };
 
-const page = (items: LoanSummary[], total = items.length) => ({ items, total, page: 1, pageSize: 25 });
+const page = (items: RequestSummary[], total = items.length) => ({ items, total, page: 1, pageSize: 25 });
 
 function signedIn(roles: Role[]) {
   sessionStorage.setItem('di.refreshToken', 'refresh-1');
@@ -102,53 +102,53 @@ function signedIn(roles: Role[]) {
 function renderRoutes(route: string) {
   return renderApp(
     <Routes>
-      <Route path="/loans" element={<LoansPage />} />
-      <Route path="/loans/new" element={<LoanFormPage />} />
-      <Route path="/loans/:id" element={<LoanDetailPage />} />
+      <Route path="/requests" element={<RequestsPage />} />
+      <Route path="/requests/new" element={<RequestFormPage />} />
+      <Route path="/requests/:id" element={<RequestDetailPage />} />
     </Routes>,
     route,
   );
 }
 
-describe('LoansPage', () => {
-  it('lists loans with status and a create link for writers', async () => {
+describe('RequestsPage', () => {
+  it('lists requests with status and a create link for writers', async () => {
     mockApi({
-      ...signedIn(['LoanOfficer']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
+      ...signedIn(['Requester']),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
     });
 
-    renderRoutes('/loans');
+    renderRoutes('/requests');
 
-    const list = await screen.findByRole('list', { name: 'Loans' });
-    expect(within(list).getByRole('link', { name: /LN-1001/ })).toHaveAttribute('href', '/loans/l1');
+    const list = await screen.findByRole('list', { name: 'Requests' });
+    expect(within(list).getByRole('link', { name: /LN-1001/ })).toHaveAttribute('href', '/requests/l1');
     expect(within(list).getByText('In progress')).toBeInTheDocument();
     expect(within(list).getByText(/\$1,250,000\.00/)).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'New loan' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'New request' })).toBeInTheDocument();
   });
 
   it('filters by status', async () => {
     const { calls } = mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
-      'GET /api/loans?page=1&pageSize=25&status=Completed': () => jsonResponse(200, page([])),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
+      'GET /api/requests?page=1&pageSize=25&status=Completed': () => jsonResponse(200, page([])),
     });
-    renderRoutes('/loans');
+    renderRoutes('/requests');
     const user = userEvent.setup();
 
     await user.selectOptions(await screen.findByLabelText('Status'), 'Completed');
 
-    expect(await screen.findByText('No loans match your search.')).toBeInTheDocument();
+    expect(await screen.findByText('No requests match your search.')).toBeInTheDocument();
     expect(calls.some((c) => c.key.endsWith('status=Completed'))).toBe(true);
   });
 
   it('pages through results using the shared pagination', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, { items: [summary], total: 26, page: 1, pageSize: 25 }),
-      'GET /api/loans?page=2&pageSize=25': () =>
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, { items: [summary], total: 26, page: 1, pageSize: 25 }),
+      'GET /api/requests?page=2&pageSize=25': () =>
         jsonResponse(200, { items: [{ ...summary, id: 'l2', reference: 'LN-2002' }], total: 26, page: 2, pageSize: 25 }),
     });
-    renderRoutes('/loans');
+    renderRoutes('/requests');
     const user = userEvent.setup();
 
     expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
@@ -161,53 +161,53 @@ describe('LoansPage', () => {
   it('returns to page 1 when the status filter changes', async () => {
     const { calls } = mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans?page=2&pageSize=25': () => jsonResponse(200, { items: [summary], total: 30, page: 2, pageSize: 25 }),
-      'GET /api/loans?page=1&pageSize=25&status=Sent': () => jsonResponse(200, page([summary])),
+      'GET /api/requests?page=2&pageSize=25': () => jsonResponse(200, { items: [summary], total: 30, page: 2, pageSize: 25 }),
+      'GET /api/requests?page=1&pageSize=25&status=Sent': () => jsonResponse(200, page([summary])),
     });
-    renderRoutes('/loans?page=2');
+    renderRoutes('/requests?page=2');
     const user = userEvent.setup();
 
     await user.selectOptions(await screen.findByLabelText('Status'), 'Sent');
 
-    await waitFor(() => expect(calls.some((c) => c.key === 'GET /api/loans?page=1&pageSize=25&status=Sent')).toBe(true));
+    await waitFor(() => expect(calls.some((c) => c.key === 'GET /api/requests?page=1&pageSize=25&status=Sent')).toBe(true));
   });
 
-  it('says so when there are no loans', async () => {
+  it('says so when there are no requests', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
 
-    renderRoutes('/loans');
+    renderRoutes('/requests');
 
-    expect(await screen.findByText('No loans yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No requests yet.')).toBeInTheDocument();
   });
 });
 
-describe('LoanFormPage', () => {
-  it('creates a loan and opens it', async () => {
+describe('RequestFormPage', () => {
+  it('creates a request and opens it', async () => {
     const { calls } = mockApi({
-      ...signedIn(['LoanOfficer']),
-      'POST /api/loans': () => jsonResponse(201, { ...loan, invites: [] }),
-      'GET /api/loans/l1': () => jsonResponse(200, { ...loan, invites: [] }),
+      ...signedIn(['Requester']),
+      'POST /api/requests': () => jsonResponse(201, { ...request, invites: [] }),
+      'GET /api/requests/l1': () => jsonResponse(200, { ...request, invites: [] }),
       'GET /api/contacts?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
       'GET /api/templates?page=1&pageSize=100': () => jsonResponse(200, { items: [], total: 0, page: 1, pageSize: 100 }),
     });
-    renderRoutes('/loans/new');
+    renderRoutes('/requests/new');
     const user = userEvent.setup();
 
     await user.type(await screen.findByLabelText('Reference'), 'LN-1001');
-    await user.type(screen.getByLabelText('Loan name'), 'Acme acquisition');
+    await user.type(screen.getByLabelText('Request name'), 'Acme acquisition');
     await user.type(screen.getByLabelText('Amount (USD)'), '1250000.5');
-    await user.type(screen.getByLabelText('Loan type'), 'SBA 7(a)');
-    await user.click(screen.getByRole('button', { name: 'Create loan' }));
+    await user.type(screen.getByLabelText('Request type'), 'SBA 7(a)');
+    await user.click(screen.getByRole('button', { name: 'Create request' }));
 
-    const post = calls.find((c) => c.key === 'POST /api/loans');
+    const post = calls.find((c) => c.key === 'POST /api/requests');
     expect(JSON.parse(post!.init!.body as string)).toEqual({
       reference: 'LN-1001',
       name: 'Acme acquisition',
       amount: 1250000.5,
-      loanType: 'SBA 7(a)',
+      requestType: 'SBA 7(a)',
     });
     expect(await screen.findByRole('heading', { name: /LN-1001/ })).toBeInTheDocument();
   });
@@ -215,23 +215,23 @@ describe('LoanFormPage', () => {
   it('shows the API errors, such as a duplicate reference', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'POST /api/loans': () => jsonResponse(409, { title: 'Conflict', detail: 'A loan with this reference already exists.' }),
+      'POST /api/requests': () => jsonResponse(409, { title: 'Conflict', detail: 'A request with this reference already exists.' }),
     });
-    renderRoutes('/loans/new');
+    renderRoutes('/requests/new');
     const user = userEvent.setup();
 
     await user.type(await screen.findByLabelText('Reference'), 'LN-1001');
-    await user.type(screen.getByLabelText('Loan name'), 'Acme');
+    await user.type(screen.getByLabelText('Request name'), 'Acme');
     await user.type(screen.getByLabelText('Amount (USD)'), '10');
-    await user.type(screen.getByLabelText('Loan type'), 'CRE');
-    await user.click(screen.getByRole('button', { name: 'Create loan' }));
+    await user.type(screen.getByLabelText('Request type'), 'CRE');
+    await user.click(screen.getByRole('button', { name: 'Create request' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('already exists');
   });
 
 });
 
-describe('LoanDetailPage', () => {
+describe('RequestDetailPage', () => {
   const contacts = {
     items: [
       { id: 'c1', firstName: 'Ann', lastName: 'Lee', email: 'ann@example.com', phone: null, partyType: 'Borrower', isPseudonymised: false },
@@ -251,20 +251,20 @@ describe('LoanDetailPage', () => {
     ],
   };
 
-  function routes(roles: Role[], current: Loan = loan) {
+  function routes(roles: Role[], current: Request = request) {
     return {
       ...signedIn(roles),
-      'GET /api/loans/l1': () => jsonResponse(200, current),
+      'GET /api/requests/l1': () => jsonResponse(200, current),
       'GET /api/contacts?page=1&pageSize=100': () => jsonResponse(200, contacts),
       'GET /api/templates?page=1&pageSize=100': () => jsonResponse(200, { items: templates, total: 1, page: 1, pageSize: 100 }),
       'GET /api/templates/t1': () => jsonResponse(200, templateDetail),
     };
   }
 
-  it('shows the loan, its status and each party with progress', async () => {
-    mockApi(routes(['LoanOfficer']));
+  it('shows the request, its status and each party with progress', async () => {
+    mockApi(routes(['Requester']));
 
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
 
     expect(await screen.findByRole('heading', { name: /LN-1001/ })).toBeInTheDocument();
     const parties = screen.getByRole('list', { name: 'Parties' });
@@ -273,29 +273,29 @@ describe('LoanDetailPage', () => {
     expect(within(parties).getByText(/1 of 2 items approved/)).toBeInTheDocument();
   });
 
-  it('downloads the approved zip for a loan officer', async () => {
+  it('downloads the approved zip for a requester', async () => {
     const createObjectURL = vi.fn(() => 'blob:x');
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
     const { calls } = mockApi({
-      ...routes(['LoanOfficer']),
-      'GET /api/loans/l1/export': () => new Response('zip', { status: 200 }),
+      ...routes(['Requester']),
+      'GET /api/requests/l1/export': () => new Response('zip', { status: 200 }),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Download approved' }));
 
     await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
-    expect(calls.some((c) => c.key === 'GET /api/loans/l1/export')).toBe(true);
+    expect(calls.some((c) => c.key === 'GET /api/requests/l1/export')).toBe(true);
   });
 
   it('explains when there is nothing approved to export', async () => {
     mockApi({
       ...routes(['Admin']),
-      'GET /api/loans/l1/export': () =>
-        jsonResponse(409, { title: 'Conflict', detail: 'This loan has no approved documents or answers to export yet.' }),
+      'GET /api/requests/l1/export': () =>
+        jsonResponse(409, { title: 'Conflict', detail: 'This request has no approved documents or answers to export yet.' }),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Download approved' }));
 
@@ -305,16 +305,16 @@ describe('LoanDetailPage', () => {
   it('revokes a link', async () => {
     let revoked = false;
     const { calls } = mockApi({
-      ...routes(['LoanOfficer']),
-      'GET /api/loans/l1': () =>
-        jsonResponse(200, { ...loan, invites: [{ ...annInvite, revokedAt: revoked ? '2027-01-06T00:00:00Z' : null }] }),
+      ...routes(['Requester']),
+      'GET /api/requests/l1': () =>
+        jsonResponse(200, { ...request, invites: [{ ...annInvite, revokedAt: revoked ? '2027-01-06T00:00:00Z' : null }] }),
       'POST /api/invites/i1/revoke': () => {
         revoked = true;
         return jsonResponse(200, { ...annInvite, revokedAt: '2027-01-06T00:00:00Z' });
       },
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Revoke link for Ann Lee' }));
@@ -329,7 +329,7 @@ describe('LoanDetailPage', () => {
       ...routes(['Admin']),
       'POST /api/invites/i1/reissue': () => jsonResponse(200, annInvite),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Reissue link for Ann Lee' }));
@@ -338,13 +338,13 @@ describe('LoanDetailPage', () => {
     expect(calls.some((c) => c.key === 'POST /api/invites/i1/reissue')).toBe(true);
   });
 
-  it('sends invites with the template items the officer selected and edited', async () => {
+  it('sends invites with the template items the requester selected and edited', async () => {
     const { calls } = mockApi({
-      ...routes(['LoanOfficer'], { ...loan, invites: [] }),
-      'POST /api/loans/l1/invites': () => jsonResponse(201, [annInvite]),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
+      ...routes(['Requester'], { ...request, invites: [] }),
+      'POST /api/requests/l1/invites': () => jsonResponse(201, [annInvite]),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Add party' }));
@@ -359,8 +359,8 @@ describe('LoanDetailPage', () => {
     await user.type(screen.getByLabelText('Reminder every (days)'), '3');
     await user.click(screen.getByRole('button', { name: 'Send invites' }));
 
-    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/loans/l1/invites')).toBe(true));
-    const post = calls.find((c) => c.key === 'POST /api/loans/l1/invites');
+    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/requests/l1/invites')).toBe(true));
+    const post = calls.find((c) => c.key === 'POST /api/requests/l1/invites');
     expect(JSON.parse(post!.init!.body as string)).toEqual({
       parties: [
         {
@@ -386,11 +386,11 @@ describe('LoanDetailPage', () => {
 
   it('sends the optional portal password with the party', async () => {
     const { calls } = mockApi({
-      ...routes(['LoanOfficer'], { ...loan, invites: [] }),
-      'POST /api/loans/l1/invites': () => jsonResponse(201, [annInvite]),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([])),
+      ...routes(['Requester'], { ...request, invites: [] }),
+      'POST /api/requests/l1/invites': () => jsonResponse(201, [annInvite]),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([])),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Add party' }));
@@ -401,14 +401,14 @@ describe('LoanDetailPage', () => {
     await user.type(screen.getByLabelText(/Portal password/), 'correct-horse');
     await user.click(screen.getByRole('button', { name: 'Send invites' }));
 
-    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/loans/l1/invites')).toBe(true));
-    const body = JSON.parse(calls.find((c) => c.key === 'POST /api/loans/l1/invites')!.init!.body as string);
+    await waitFor(() => expect(calls.some((c) => c.key === 'POST /api/requests/l1/invites')).toBe(true));
+    const body = JSON.parse(calls.find((c) => c.key === 'POST /api/requests/l1/invites')!.init!.body as string);
     expect(body.parties[0].password).toBe('correct-horse');
   });
 
   it('does not offer a party that was already invited', async () => {
-    mockApi(routes(['LoanOfficer']));
-    renderRoutes('/loans/l1');
+    mockApi(routes(['Requester']));
+    renderRoutes('/requests/l1');
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Add party' }));
@@ -420,11 +420,11 @@ describe('LoanDetailPage', () => {
 
   it('shows the API error when sending fails', async () => {
     mockApi({
-      ...routes(['LoanOfficer'], { ...loan, invites: [] }),
-      'POST /api/loans/l1/invites': () =>
+      ...routes(['Requester'], { ...request, invites: [] }),
+      'POST /api/requests/l1/invites': () =>
         jsonResponse(400, { title: 'Validation', errors: { 'parties[0].dueDate': ['The due date cannot be in the past.'] } }),
     });
-    renderRoutes('/loans/l1');
+    renderRoutes('/requests/l1');
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Add party' }));
@@ -437,43 +437,43 @@ describe('LoanDetailPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('cannot be in the past');
   });
 
-  it('says so when the loan does not exist', async () => {
+  it('says so when the request does not exist', async () => {
     mockApi({
       ...signedIn(['Admin']),
-      'GET /api/loans/l9': () => jsonResponse(404, { title: 'Not Found' }),
+      'GET /api/requests/l9': () => jsonResponse(404, { title: 'Not Found' }),
     });
 
-    renderRoutes('/loans/l9');
+    renderRoutes('/requests/l9');
 
-    expect(await screen.findByText('This loan does not exist.')).toBeInTheDocument();
+    expect(await screen.findByText('This request does not exist.')).toBeInTheDocument();
   });
 });
 
-describe('LoansPage dashboard', () => {
-  it('shows progress, due date and an overdue flag on each loan', async () => {
+describe('RequestsPage dashboard', () => {
+  it('shows progress, due date and an overdue flag on each request', async () => {
     mockApi({
-      ...signedIn(['LoanOfficer']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([{ ...summary, isOverdue: true }])),
+      ...signedIn(['Requester']),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([{ ...summary, isOverdue: true }])),
     });
 
-    renderRoutes('/loans');
+    renderRoutes('/requests');
 
-    const list = await screen.findByRole('list', { name: 'Loans' });
+    const list = await screen.findByRole('list', { name: 'Requests' });
     expect(within(list).getByRole('progressbar', { name: 'Progress for LN-1001' })).toHaveAttribute('aria-valuenow', '25');
     expect(within(list).getByText(/25% complete \(1 of 4 items approved\)/)).toBeInTheDocument();
     expect(within(list).getByText(/due Feb 1, 2027/)).toBeInTheDocument();
     expect(within(list).getByText('Overdue')).toBeInTheDocument();
   });
 
-  it('does not flag a loan that is not overdue', async () => {
+  it('does not flag a request that is not overdue', async () => {
     mockApi({
-      ...signedIn(['LoanOfficer']),
-      'GET /api/loans?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
+      ...signedIn(['Requester']),
+      'GET /api/requests?page=1&pageSize=25': () => jsonResponse(200, page([summary])),
     });
 
-    renderRoutes('/loans');
+    renderRoutes('/requests');
 
-    await screen.findByRole('list', { name: 'Loans' });
+    await screen.findByRole('list', { name: 'Requests' });
     expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
   });
 });

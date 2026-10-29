@@ -117,7 +117,7 @@ function RunRemindersPanel() {
 }
 
 interface DemoReset {
-  loans: number;
+  requests: number;
   contacts: number;
 }
 
@@ -135,18 +135,18 @@ function ResetDemoPanel() {
   return (
     <div className="space-y-3">
       <p>
-        Deletes all loans, contacts, uploaded files and stored emails, then creates the sample data again. The audit log
+        Deletes all requests, contacts, uploaded files and stored emails, then creates the sample data again. The audit log
         is kept and the reset is recorded in it.
       </p>
       <ErrorList messages={messagesOf(reset.error)} />
       {reset.isSuccess && (
         <p role="status" className="text-sm text-green-700">
-          Demo data reset. {plural(reset.data.loans, 'sample loan')} created.
+          Demo data reset. {plural(reset.data.requests, 'sample request')} created.
         </p>
       )}
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-ink">Delete all current loan data and start again?</span>
+          <span className="text-sm text-ink">Delete all current request data and start again?</span>
           <button type="button" disabled={reset.isPending} onClick={() => reset.mutate()} className={primaryButtonClass}>
             {reset.isPending ? 'Resetting...' : 'Yes, reset'}
           </button>
@@ -171,14 +171,14 @@ function ResetDemoPanel() {
 interface RetentionPreview {
   retentionDays: number;
   cutoff: string;
-  loanCount: number;
+  requestCount: number;
   fileCount: number;
   contactCount: number;
-  loans: PagedResponse<{ id: string; reference: string; name: string; completedAt: string; fileCount: number }>;
+  requests: PagedResponse<{ id: string; reference: string; name: string; completedAt: string; fileCount: number }>;
 }
 
 interface RetentionRun {
-  loansDeleted: number;
+  requestsDeleted: number;
   filesDeleted: number;
   contactsPseudonymised: number;
 }
@@ -197,7 +197,7 @@ function RetentionPanel() {
     staleTime: Infinity,
     gcTime: 0,
   });
-  useClampPage(paging, preview.data?.loans.total);
+  useClampPage(paging, preview.data?.requests.total);
 
   const run = useMutation({
     mutationFn: () => apiFetch<RetentionRun>('/api/gdpr/retention/run', { method: 'POST' }),
@@ -205,7 +205,7 @@ function RetentionPanel() {
       setConfirming(false);
       setPreviewing(false);
       queryClient.removeQueries({ queryKey: ['retention-preview'] });
-      void queryClient.invalidateQueries({ queryKey: ['loans'] });
+      void queryClient.invalidateQueries({ queryKey: ['requests'] });
       void queryClient.invalidateQueries({ queryKey: ['contacts'] });
     },
   });
@@ -215,32 +215,32 @@ function RetentionPanel() {
   return (
     <div className="space-y-3">
       <p>
-        Loans completed more than the retention period ago can be purged: their files and data are deleted and contacts
-        left without a loan are pseudonymised. Preview first; the preview changes nothing. Both are recorded in the
+        Requests completed more than the retention period ago can be purged: their files and data are deleted and contacts
+        left without a request are pseudonymised. Preview first; the preview changes nothing. Both are recorded in the
         audit log.
       </p>
       <ErrorList messages={[...messagesOf(preview.error), ...messagesOf(run.error)]} />
       {run.isSuccess && (
         <p role="status" className="text-sm text-green-700">
-          Purge finished. {plural(run.data.loansDeleted, 'loan')} and {plural(run.data.filesDeleted, 'file')} deleted,{' '}
+          Purge finished. {plural(run.data.requestsDeleted, 'request')} and {plural(run.data.filesDeleted, 'file')} deleted,{' '}
           {plural(run.data.contactsPseudonymised, 'contact')} pseudonymised.
         </p>
       )}
       {data && (
         <div className="space-y-3 text-sm text-ink">
           <p>
-            Cut-off {new Date(data.cutoff).toLocaleDateString()} ({data.retentionDays} days): {plural(data.loanCount, 'loan')},{' '}
+            Cut-off {new Date(data.cutoff).toLocaleDateString()} ({data.retentionDays} days): {plural(data.requestCount, 'request')},{' '}
             {plural(data.fileCount, 'file')} and {plural(data.contactCount, 'contact')} would be purged.
           </p>
-          {data.loans.items.length > 0 && (
+          {data.requests.items.length > 0 && (
             <ul className="divide-y divide-surface-border rounded-md border border-surface-border">
-              {data.loans.items.map((loan) => (
-                <li key={loan.id} className="flex flex-wrap justify-between gap-2 p-2">
+              {data.requests.items.map((request) => (
+                <li key={request.id} className="flex flex-wrap justify-between gap-2 p-2">
                   <span>
-                    {loan.reference} - {loan.name}
+                    {request.reference} - {request.name}
                   </span>
                   <span className="text-ink-muted">
-                    completed {new Date(loan.completedAt).toLocaleDateString()}, {plural(loan.fileCount, 'file')}
+                    completed {new Date(request.completedAt).toLocaleDateString()}, {plural(request.fileCount, 'file')}
                   </span>
                 </li>
               ))}
@@ -249,7 +249,7 @@ function RetentionPanel() {
           <Pagination
             page={paging.page}
             pageSize={paging.pageSize}
-            total={data.loans.total}
+            total={data.requests.total}
             onPageChange={paging.setPage}
             onPageSizeChange={paging.setPageSize}
           />
@@ -268,14 +268,14 @@ function RetentionPanel() {
         >
           {preview.isFetching ? 'Loading preview...' : 'Preview purge'}
         </button>
-        {data && data.loanCount > 0 && !confirming && (
+        {data && data.requestCount > 0 && !confirming && (
           <button type="button" onClick={() => setConfirming(true)} className={secondaryButtonClass}>
             Run purge...
           </button>
         )}
         {confirming && (
           <>
-            <span className="text-sm text-ink">Permanently delete these loans and their files?</span>
+            <span className="text-sm text-ink">Permanently delete these requests and their files?</span>
             <button type="button" disabled={run.isPending} onClick={() => run.mutate()} className={primaryButtonClass}>
               {run.isPending ? 'Purging...' : 'Yes, purge'}
             </button>
