@@ -117,6 +117,15 @@ Troubleshooting: if no mail arrives, check the Resend dashboard, Logs, for the s
 
 **Deploy API** builds and tests on every push to `main` and on manual dispatch. When any of its secrets is missing it logs a notice, skips the Azure steps and still succeeds.
 
+## Reminders cron caveats
+
+The `Reminders cron` workflow (`.github/workflows/reminders-cron.yml`) calls `POST /internal/jobs/reminders` hourly and can be started by hand from the Actions tab (Run workflow).
+
+- GitHub disables scheduled workflows after 60 days without repository activity. If reminders stop arriving, open the Actions tab, re-enable the workflow and run it once by hand; any push to the repository also resets the clock.
+- The hourly schedule is best effort. GitHub can start a run several minutes late, or skip a run when the platform is busy, so reminders may arrive later than the hour they are due.
+- The job is idempotent: a late, repeated or manual run does not send a reminder twice.
+- A failed run (non-2xx response, missing secret, or timeout) fails the workflow. GitHub e-mails the person who last edited the cron schedule about failed scheduled runs, so keep Actions notifications enabled for that account. Check the Actions tab if reminders seem to be missing.
+
 ## Web app (Vercel)
 
 Vercel deploys from the Git integration; there is no deploy workflow. In the Vercel project set the root directory to `src/DocumentInvite.Web` and add `VITE_API_BASE_URL` set to the API URL (`apiUrl` output, for example `https://<app>.azurewebsites.net`). `src/DocumentInvite.Web/vercel.json` rewrites every path to `index.html` for the single-page app.
