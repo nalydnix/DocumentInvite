@@ -24,6 +24,9 @@ param sqlAdminLogin string = 'diadmin'
 @secure()
 param sqlAdminPassword string
 
+@description('Set false to create the database by hand (for example when the free offer is not available in the region).')
+param createSqlDatabase bool = true
+
 @description('Name of the private blob container for uploaded documents.')
 param blobContainerName string = 'documents'
 
@@ -84,7 +87,7 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
   }
 }
 
-resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = if (createSqlDatabase) {
   parent: sqlServer
   name: sqlDatabaseName
   location: location
@@ -145,6 +148,6 @@ output webAppName string = webApp.name
 output appServicePlanName string = plan.name
 output sqlServerName string = sqlServer.name
 output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
-output sqlDatabaseName string = sqlDatabase.name
+output sqlDatabaseName string = sqlDatabaseName
 output storageAccountName string = storage.name
 output blobContainerName string = container.name
