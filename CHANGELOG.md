@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- First-run admin guide (`docs/admin-guide.md`): production checklist, secrets, staff users, templates, first invite and retention. The recipient portal now shows a "Need help?" section, and the privacy notice states that data is deleted after a limited period.
+
 ### Changed
 
 - Loans are now Requests everywhere: UI text, emails, API routes (`/api/requests`), web routes (`/requests`, with `/loans` redirecting), code and database. The staff role `LoanOfficer` is now `Requester`; staff are requesters and the external people who complete requests are recipients.
