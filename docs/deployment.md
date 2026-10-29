@@ -72,7 +72,7 @@ Set these on the App Service (Settings, Environment variables). `provision` sets
 | `Jobs__ApiKey` | Key for `POST /internal/jobs/reminders`; must equal the `REMINDERS_API_KEY` secret |
 | `Bootstrap__AdminEmail`, `Bootstrap__AdminPassword` | Creates the first Admin; remove after the first start |
 | `Email__Provider`, `Email__From`, `Resend__ApiKey` | Outbound e-mail (Resend) |
-| `Demo__Enabled` | `false` in production (script); see the README for the demo account keys |
+| `Demo__Enabled` | `false` in production (script); see the README for the demo account keys. For go-live, follow [admin-guide.md](admin-guide.md) |
 | `Scalar__Enabled` | `false` (script). Set `true` only to expose `/openapi/v1.json` and `/scalar` outside Development |
 
 `Blob__CorsAllowedOrigins` is for development with Azurite only; in Azure the CORS rule comes from the Bicep template.

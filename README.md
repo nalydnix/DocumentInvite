@@ -4,6 +4,8 @@ Secure document-collection platform for commercial lenders. See [docs/architectu
 
 Deployment (Azure App Service, Vercel, Bicep): see [docs/deployment.md](docs/deployment.md).
 
+First-run setup for real users (secrets, staff, first invite): see [docs/admin-guide.md](docs/admin-guide.md).
+
 ## Prerequisites
 
 - .NET SDK 10

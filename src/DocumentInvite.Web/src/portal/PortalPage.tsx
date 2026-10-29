@@ -165,9 +165,9 @@ function PrivacyNotice({ onAccepted }: { onAccepted: () => void }) {
       </h2>
       <p className="text-sm text-ink">
         Your lender uses this page to collect the documents and information needed for your request. What you upload
-        and enter is stored securely, is visible only to the lender&apos;s team, and is kept only as long as needed
-        for the request. Each time you open this page or add something is recorded for security. You can ask your
-        lender to export or erase your data.
+        and enter is stored securely, is visible only to the lender&apos;s team, and is not shared with anyone else. It is kept only for a limited period after your request is completed and then deleted.
+        Each time you open this page or add something is recorded for security. You can ask your lender at any time
+        for a copy of your data or to have it erased.
       </p>
       <label className="flex min-h-11 items-start gap-3 text-sm font-medium text-ink">
         <input
@@ -260,6 +260,19 @@ function Checklist({ onSessionEnded, upload }: { onSessionEnded: () => void; upl
       </ul>
 
       <PortalThread privacyAccepted={data.privacyAccepted} onSessionEnded={onSessionEnded} />
+
+      <section aria-labelledby="help-heading" className="space-y-2 rounded-card border border-surface-border bg-surface p-4">
+        <h2 id="help-heading" className="text-base font-semibold text-ink">
+          Need help?
+        </h2>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-ink-muted">
+          <li>Open each item on the list and add the file or answer it asks for.</li>
+          <li>Your lender reviews each item. If one is sent back, the reason is shown on it so you can add it again.</li>
+          <li>You can leave and come back with the same link at any time. Your progress is saved.</li>
+          <li>Questions about what is needed? Send a message to your lender using the messages box above.</li>
+          <li>If the link stops working, ask your lender to send you a new one.</li>
+        </ul>
+      </section>
     </>
   );
 }
