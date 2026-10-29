@@ -2,7 +2,8 @@
 Provisions the Azure resources for DocumentInvite. Idempotent: safe to run again.
 Run by the repository owner only.
 
-Usage: ./infra/provision.ps1 -NamePrefix <prefix> -Location <region> -WebOrigin <https://app.example.com> [-ResourceGroup <name>]
+Usage: ./infra/provision.ps1 -NamePrefix <prefix> -Location <region> -WebOrigin <https://app.example.com> [-ResourceGroup <name>] [-SkipDatabase]
+-SkipDatabase deploys everything except the SQL database (create a database named DocumentInvite by hand).
 The SQL administrator password is read from $env:SQL_ADMIN_PASSWORD or prompted for.
 #>
 [CmdletBinding()]
@@ -31,6 +32,22 @@ if (-not $sqlPassword) {
     $sqlPassword = [System.Net.NetworkCredential]::new('', $secure).Password
 }
 
+# Reject passwords that cmd.exe (az.cmd on Windows), connection strings or Azure SQL would mishandle.
+function Test-SqlAdminPassword([string]$Password, [string]$Login) {
+    if ($Password.Length -lt 12 -or $Password.Length -gt 128) { return 'must be 12 to 128 characters long' }
+    if ($Password -match '[&|^<>%";\s]') { return 'must not contain & | ^ < > % " ; or whitespace (cmd.exe and connection strings would mangle them)' }
+    if ($Login -and $Password.IndexOf($Login, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'must not contain the SQL administrator login' }
+    $classes = 0
+    foreach ($pattern in '[a-z]', '[A-Z]', '[0-9]', '[^a-zA-Z0-9]') {
+        if ($Password -cmatch $pattern) { $classes++ }
+    }
+    if ($classes -lt 3) { return 'must use at least three of: lowercase, uppercase, digits, other characters' }
+    return $null
+}
+
+$passwordProblem = Test-SqlAdminPassword $sqlPassword $SqlAdminLogin
+if ($passwordProblem) { throw "Invalid SQL administrator password: it $passwordProblem." }
+
 $deployment = "documentinvite-$NamePrefix"
 
 Write-Host "Creating resource group $ResourceGroup in $Location..."
@@ -44,6 +61,7 @@ az deployment group create `
     --template-file (Join-Path $PSScriptRoot 'main.bicep') `
     --parameters namePrefix=$NamePrefix location=$Location webOrigin=$WebOrigin `
                  sqlAdminLogin=$SqlAdminLogin sqlAdminPassword=$sqlPassword `
+                 createSqlDatabase=$(if ($SkipDatabase) { 'false' } else { 'true' }) `
     --output none
 if ($LASTEXITCODE -ne 0) { throw 'Bicep deployment failed.' }
 
@@ -96,6 +114,6 @@ Still to set on the web app (App Service > Environment variables):
 Vercel project environment variable:
   VITE_API_BASE_URL            $apiUrl
 
-Next: create the least-privilege SQL user (docs/deployment.md, "Runtime database user"), and
+$(if ($SkipDatabase) { "Database skipped: create a database named $sqlDb on server $sqlServer by hand (docs/deployment.md), then continue.`n" })Next: create the least-privilege SQL user (docs/deployment.md, "Runtime database user"), and
 add your IP to the SQL server firewall if you run migrations from your machine.
 "@

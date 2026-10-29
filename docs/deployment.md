@@ -32,6 +32,10 @@ Outputs: `apiUrl`, `webAppName`, `appServicePlanName`, `sqlServerName`, `sqlServ
    ./infra/provision.ps1 -NamePrefix <name-prefix> -Location <location> -WebOrigin <web-origin>
    ```
 
+   The SQL admin password must be 12 to 128 characters, use at least three of lowercase, uppercase, digits and other characters, not contain the admin login, and not contain `&`, `|`, `^`, `<`, `>`, `%`, `"`, `;` or whitespace. On Windows `az` runs through `cmd.exe`, which would cut the value at those characters, and `;` breaks the connection string. Both scripts check this before calling Azure and stop with a message.
+
+   The free database offer is not available in every Azure region; there, deployment fails with `ProvisioningDisabled` and leaves a half-created resource group. Pass `-SkipDatabase` (PowerShell) or `--skip-database` / `SKIP_DATABASE=true` (bash) to deploy everything else, then create a database named `DocumentInvite` on the provisioned SQL server by hand (Azure portal, Create database, applying the free offer where your region has it). The `sqlDatabaseName` output still returns `DocumentInvite`. Check the free offer for your region before choosing it; this guide does not list supported regions.
+
 5. Create the runtime database user (next section).
 6. Set the remaining App Service settings (below) and the GitHub secrets and Vercel variable that the script printed.
 7. Run the **Deploy API** workflow (Actions, Run workflow), or push to `main`.
