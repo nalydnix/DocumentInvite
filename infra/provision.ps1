@@ -11,6 +11,7 @@ param(
     [Parameter(Mandatory)][string]$NamePrefix,
     [Parameter(Mandatory)][string]$Location,
     [Parameter(Mandatory)][string]$WebOrigin,
+    [switch]$SkipDatabase,
     [string]$ResourceGroup = "$NamePrefix-rg",
     [string]$SqlAdminLogin = $(if ($env:SQL_ADMIN_LOGIN) { $env:SQL_ADMIN_LOGIN } else { 'diadmin' })
 )
