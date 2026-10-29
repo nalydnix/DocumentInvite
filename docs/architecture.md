@@ -1,6 +1,7 @@
 # DocumentInvite – Architecture
 
-DocumentInvite is a secure document-collection platform for commercial lenders. A lender team requests documents and data from each party on a request. Each party completes the request through a secure link, with no account. The team reviews each item, then exports a package with consistent file names. Every significant action, including reads, is recorded in a tamper-evident audit trail. In the product, staff who send requests are requesters and the external people who complete them are recipients (the `Party` role in the model below).
+DocumentInvite is a secure document-collection platform for commercial lenders. A lender team requests documents and data from each party on a request. Each party completes the request through a secure link, with no account. The team reviews each item, then exports a package with consistent file names. Every significant action, including reads, is recorded in a tamper-evident audit trail.
+ In the product, staff who send requests are requesters and the external people who complete them are recipients (the `Party` role in the model below).
 
 This is a portfolio-grade MVP. The priorities are code quality, security, privacy compliance (SOC 2 / GDPR minded) and a clear demo, ahead of feature count. The product has no AI or LLM features.
 
