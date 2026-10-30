@@ -1,4 +1,4 @@
-# DocumentInvite
+# DocumentInvitge
 
 Secure document-collection platform for commercial lenders. See [docs/architecture.md](docs/architecture.md) for the design.
 
