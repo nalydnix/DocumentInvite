@@ -50,7 +50,7 @@ function InviteRow({ invite, canWrite, locked }: { invite: Invite; canWrite: boo
             </span>
           )}
           {revoked ? (
-            <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Link revoked</span>
+            <span className="rounded-full bg-danger-50 px-2 py-0.5 text-xs font-medium text-danger-700">Link revoked</span>
           ) : (
             <StatusBadge status={invite.status} />
           )}
@@ -130,7 +130,7 @@ function CompletionPanel({ request }: { request: Request }) {
     <section className="space-y-3" aria-label="Request completion">
       {isCompleted ? (
         <>
-          <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+          <p role="status" className="rounded-lg bg-success-50 p-3 text-sm text-success-700">
             This request is completed and locked. Items cannot be approved or rejected and invites cannot be sent or
             revoked until it is reopened.
           </p>

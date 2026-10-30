@@ -11,7 +11,7 @@ export type MessageAuthor = 'Team' | 'Party' | 'System';
 export interface ThreadEntry {
   id: string;
   authorType: MessageAuthor;
-  /** Shown above the text; the portal passes "Your lender" for the team. */
+  /** Shown above the text; the portal passes "Your requester" for the team. */
   authorLabel: string;
   body: string;
   /** True for an internal note. Only the staff view ever has these. */
@@ -33,17 +33,17 @@ function Entry({ entry, viewer }: { entry: ThreadEntry; viewer: 'staff' | 'party
 
   const mine = (viewer === 'staff') === (entry.authorType === 'Team');
   const tone = entry.isInternal
-    ? 'border border-amber-200 bg-amber-50 text-ink'
+    ? 'border border-warning-200 bg-warning-50 text-ink'
     : mine
       ? 'bg-brand-600 text-white'
       : 'border border-surface-border bg-surface text-ink';
-  const meta = entry.isInternal ? 'text-amber-800' : mine ? 'text-brand-50' : 'text-ink-muted';
+  const meta = entry.isInternal ? 'text-warning-700' : mine ? 'text-brand-50' : 'text-ink-muted';
 
   return (
     <li className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[90%] rounded-lg px-3 py-2 text-sm sm:max-w-[80%] ${tone}`}>
         <p className={`text-xs font-medium ${meta}`}>
-          {entry.isInternal && <span className="mr-1 rounded bg-amber-100 px-1 py-0.5">Internal note</span>}
+          {entry.isInternal && <span className="mr-1 rounded bg-warning-50 px-1 py-0.5">Internal note</span>}
           {entry.authorLabel}
         </p>
         <p className="mt-1 whitespace-pre-wrap break-words">{entry.body}</p>
@@ -92,7 +92,7 @@ export function MessageList({
   }, [total, page, pageSize, onPageChange]);
 
   if (loading) return <p className="text-sm text-ink-muted">Loading messages...</p>;
-  if (error) return <p role="alert" className="text-sm text-red-700">{error}</p>;
+  if (error) return <p role="alert" className="text-sm text-danger-700">{error}</p>;
   return (
     <div className="space-y-3">
       {entries.length === 0 ? (

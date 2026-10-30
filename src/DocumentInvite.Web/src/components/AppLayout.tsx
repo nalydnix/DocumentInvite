@@ -43,8 +43,10 @@ function NavLinks({ user, onNavigate }: { user: CurrentUser; onNavigate?: () => 
             to={item.to}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `rounded-lg px-3 py-2 text-sm font-medium ${
-                isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-surface-muted'
+              `block rounded-lg px-3 py-2 text-sm font-medium ${
+                isActive
+                ? 'bg-brand-50 text-brand-700 shadow-[inset_3px_0_0_0_theme(colors.brand.600)]'
+                : 'text-ink hover:bg-surface-muted'
               }`
             }
           >
@@ -112,7 +114,7 @@ export function AppLayout() {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:px-8 md:py-8">
         <Outlet />
       </main>
     </div>

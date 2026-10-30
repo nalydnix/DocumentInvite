@@ -61,7 +61,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       <div className="space-y-3 sm:col-span-2">
         <ErrorList messages={messagesOf(save.error)} />
         {save.isSuccess && (
-          <p role="status" className="text-sm text-green-700">
+          <p role="status" className="text-sm text-success-700">
             Settings saved.
           </p>
         )}
@@ -140,7 +140,7 @@ function ResetDemoPanel() {
       </p>
       <ErrorList messages={messagesOf(reset.error)} />
       {reset.isSuccess && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="text-sm text-success-700">
           Demo data reset. {plural(reset.data.requests, 'sample request')} created.
         </p>
       )}
@@ -221,7 +221,7 @@ function RetentionPanel() {
       </p>
       <ErrorList messages={[...messagesOf(preview.error), ...messagesOf(run.error)]} />
       {run.isSuccess && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="text-sm text-success-700">
           Purge finished. {plural(run.data.requestsDeleted, 'request')} and {plural(run.data.filesDeleted, 'file')} deleted,{' '}
           {plural(run.data.contactsPseudonymised, 'contact')} pseudonymised.
         </p>

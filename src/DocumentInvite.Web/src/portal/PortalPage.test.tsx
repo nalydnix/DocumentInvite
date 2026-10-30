@@ -85,7 +85,7 @@ describe('PortalPage', () => {
     expect(calls[1].init!.headers).toMatchObject({ Authorization: 'Bearer session-1' });
   });
 
-  it('shows the message thread with the lender below the checklist', async () => {
+  it('shows the message thread with the requester below the checklist', async () => {
     mockApi({
       'POST /api/portal/session': session,
       'GET /api/portal/invite': () => jsonResponse(200, invite()),
@@ -102,7 +102,7 @@ describe('PortalPage', () => {
 
     const thread = await screen.findByRole('region', { name: 'Messages' });
     expect(await within(thread).findByText('Please resend page 2')).toBeInTheDocument();
-    expect(within(thread).getByLabelText('Message your lender')).toBeInTheDocument();
+    expect(within(thread).getByLabelText('Message your requester')).toBeInTheDocument();
   });
 
   it('asks the party to accept the privacy notice before anything can be added', async () => {
@@ -192,14 +192,14 @@ describe('PortalPage', () => {
     ['link_revoked', 410, 'This link is no longer active'],
   ])('shows a friendly error for %s', async (code, status, title) => {
     mockApi({
-      'POST /api/portal/session': () => jsonResponse(status, { title, detail: 'Ask your lender for a new link.', code }),
+      'POST /api/portal/session': () => jsonResponse(status, { title, detail: 'Ask your requester for a new link.', code }),
     });
 
     renderPortal();
 
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByRole('heading', { name: title })).toBeInTheDocument();
-    expect(alert).toHaveTextContent('Ask your lender for a new link.');
+    expect(alert).toHaveTextContent('Ask your requester for a new link.');
   });
 
   it('asks for the password and retries after a wrong one', async () => {

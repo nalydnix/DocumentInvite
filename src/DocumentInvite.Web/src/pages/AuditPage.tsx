@@ -160,7 +160,7 @@ function VerifyPanel() {
           <p
             role="status"
             className={`rounded-lg border p-3 text-sm ${
-              result.isValid ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700'
+              result.isValid ? 'border-success-200 bg-success-50 text-success-700' : 'border-danger-200 bg-danger-50 text-danger-700'
             }`}
           >
             {result.isValid
