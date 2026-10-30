@@ -13,9 +13,16 @@ const STATUS_LABEL: Record<ItemStatus, string> = {
 
 const STATUS_STYLE: Record<ItemStatus, string> = {
   Outstanding: 'bg-surface-muted text-ink-muted',
-  Submitted: 'bg-brand-50 text-brand-700',
-  Approved: 'bg-green-50 text-green-700',
-  Rejected: 'bg-red-50 text-red-700',
+  Submitted: 'bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200',
+  Approved: 'bg-success-50 text-success-700 ring-1 ring-inset ring-success-200',
+  Rejected: 'bg-danger-50 text-danger-700 ring-1 ring-inset ring-danger-200',
+};
+
+const CARD_BORDER: Record<ItemStatus, string> = {
+  Outstanding: 'border-surface-border',
+  Submitted: 'border-surface-border',
+  Approved: 'border-success-200',
+  Rejected: 'border-danger-200',
 };
 
 function messagesOf(error: unknown): string[] {
@@ -73,7 +80,7 @@ function FieldEditor({ item, disabled, onSaved }: { item: PortalItem; disabled: 
         {save.isPending ? 'Saving...' : 'Save answer'}{' '}
         <span className="sr-only">for {item.name}</span>
       </button>
-      {save.isSuccess && !save.isPending && <span role="status" className="ml-2 text-sm text-green-700">Saved</span>}
+      {save.isSuccess && !save.isPending && <span role="status" className="ml-2 text-sm text-success-700">Saved</span>}
       <ErrorList messages={messagesOf(save.error)} />
     </form>
   );
@@ -119,7 +126,7 @@ function NoteEditor({ item, disabled, onSaved }: { item: PortalItem; disabled: b
       <button type="submit" className="min-h-11 text-sm font-medium text-brand-700 hover:underline disabled:opacity-60" disabled={disabled || save.isPending}>
         {save.isPending ? 'Saving...' : 'Save note'}
       </button>
-      {save.isSuccess && !save.isPending && <span role="status" className="ml-2 text-sm text-green-700">Note saved</span>}
+      {save.isSuccess && !save.isPending && <span role="status" className="ml-2 text-sm text-success-700">Note saved</span>}
       <ErrorList messages={messagesOf(save.error)} />
     </form>
   );
@@ -141,7 +148,7 @@ export function ItemCard({ item, privacyAccepted, onChanged, upload }: Props) {
   return (
     <li
       aria-label={item.name}
-      className="space-y-3 rounded-card border border-surface-border bg-surface p-4 shadow-card"
+      className={`space-y-3 rounded-card border bg-surface p-4 shadow-card ${CARD_BORDER[item.status]}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -156,9 +163,9 @@ export function ItemCard({ item, privacyAccepted, onChanged, upload }: Props) {
       {item.instructions && <p className="whitespace-pre-line break-words text-sm text-ink-muted">{item.instructions}</p>}
 
       {item.status === 'Rejected' && (
-        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">
           <p className="font-medium">Please fix this item</p>
-          <p className="break-words">{item.rejectionReason ?? 'Your lender asked for this item again.'}</p>
+          <p className="break-words">{item.rejectionReason ?? 'Your requester asked for this item again.'}</p>
         </div>
       )}
 

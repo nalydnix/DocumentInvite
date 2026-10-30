@@ -4,6 +4,20 @@
 
 @layer base {
   body {
-    @apply bg-surface-muted text-ink antialiased;
+    @apply bg-surface-muted font-sans text-ink antialiased;
+  }
+
+  /* One keyboard focus treatment for every control, visible on both light and tinted surfaces. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-600 ring-offset-2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
   }
 }

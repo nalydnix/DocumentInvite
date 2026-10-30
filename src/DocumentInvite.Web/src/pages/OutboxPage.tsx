@@ -77,7 +77,7 @@ function EmailViewer({ id, onBack }: { id: string; onBack: () => void }) {
             </button>
             <ErrorList messages={messagesOf(setRead.error)} />
             {email.deliveryError && (
-              <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-red-700">
+              <p role="alert" className="mt-3 rounded-lg border border-danger-200 bg-danger-50 p-2 text-danger-700">
                 Not delivered: {email.deliveryError}
               </p>
             )}
@@ -140,7 +140,7 @@ export function OutboxPage() {
                     <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
                       <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
                       {item.deliveryError && (
-                        <span className="rounded bg-red-50 px-1.5 py-0.5 font-medium text-red-700">Not delivered</span>
+                        <span className="rounded bg-danger-50 px-1.5 py-0.5 font-medium text-danger-700">Not delivered</span>
                       )}
                     </span>
                   </button>

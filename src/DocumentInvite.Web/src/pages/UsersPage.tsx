@@ -171,7 +171,7 @@ function UserRow({ user }: { user: UserSummary }) {
           <p className="text-sm text-ink-muted">{user.email}</p>
         </div>
         {user.isLockedOut && (
-          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Locked out</span>
+          <span className="rounded-full bg-danger-50 px-2 py-0.5 text-xs font-medium text-danger-700">Locked out</span>
         )}
       </div>
 

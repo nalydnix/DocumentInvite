@@ -120,9 +120,9 @@ export function GdprPanel({
               <div
                 role="alertdialog"
                 aria-label="Confirm erasure"
-                className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-3"
+                className="space-y-3 rounded-lg border border-danger-200 bg-danger-50 p-3"
               >
-                <p className="font-medium text-red-700">
+                <p className="font-medium text-danger-700">
                   This cannot be undone.
                 </p>
                 <label className="flex items-start gap-2">

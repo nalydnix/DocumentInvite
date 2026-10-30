@@ -132,7 +132,7 @@ export function FileUploader({ itemId, itemName, allowMultiple, disabled = false
       </div>
 
       {problems.length > 0 && (
-        <ul role="alert" className="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <ul role="alert" className="space-y-1 rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">
           {problems.map((problem) => (
             <li key={problem}>{problem}</li>
           ))}
@@ -164,7 +164,7 @@ export function FileUploader({ itemId, itemName, allowMultiple, disabled = false
                   <div className="h-full bg-brand-600 transition-all" style={{ width: `${row.fraction * 100}%` }} />
                 </div>
               )}
-              {row.state === 'error' && <p className="mt-1 text-red-700">{row.error}</p>}
+              {row.state === 'error' && <p className="mt-1 text-danger-700">{row.error}</p>}
             </li>
           ))}
         </ul>

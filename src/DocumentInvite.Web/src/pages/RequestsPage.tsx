@@ -49,7 +49,7 @@ function RequestCard({ request }: { request: RequestSummary }) {
       </div>
       <div className="flex items-center gap-2 md:justify-end">
         {request.isOverdue && (
-          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Overdue</span>
+          <span className="rounded-full bg-danger-50 px-2 py-0.5 text-xs font-medium text-danger-700">Overdue</span>
         )}
         <StatusBadge status={request.status} />
       </div>

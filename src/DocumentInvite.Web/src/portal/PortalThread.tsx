@@ -8,13 +8,13 @@ function toEntry(message: PortalMessage): ThreadEntry {
   return {
     id: message.id,
     authorType: message.authorType,
-    authorLabel: message.authorType === 'Party' ? 'You' : message.authorType === 'Team' ? 'Your lender' : 'DocumentInvite',
+    authorLabel: message.authorType === 'Party' ? 'You' : message.authorType === 'Team' ? 'Your requester' : 'DocumentInvite',
     body: message.body,
     createdAt: message.createdAt,
   };
 }
 
-/** The message thread with the lender, in the portal. Posting needs the privacy notice to be accepted. */
+/** The message thread with the requester, in the portal. Posting needs the privacy notice to be accepted. */
 export function PortalThread({
   privacyAccepted,
   onSessionEnded,
@@ -54,9 +54,9 @@ export function PortalThread({
       {privacyAccepted ? (
         <>
           <MessageForm
-            label="Message your lender"
+            label="Message your requester"
             submitLabel="Send message"
-            placeholder="Ask a question or add a note for your lender."
+            placeholder="Ask a question or add a note for your requester."
             onSubmit={async (body) => {
               await post.mutateAsync(body);
             }}

@@ -8,8 +8,8 @@ import { formatBytes, type InviteItem, type ItemFile, type ReadUrl, type Request
 const ITEM_STATUS_STYLES: Record<RequestItemStatus, string> = {
   Outstanding: 'bg-surface-muted text-ink-muted',
   Submitted: 'bg-brand-50 text-brand-700',
-  Approved: 'bg-green-50 text-green-700',
-  Rejected: 'bg-red-50 text-red-700',
+  Approved: 'bg-success-50 text-success-700',
+  Rejected: 'bg-danger-50 text-danger-700',
 };
 
 const LOCKED_HINT = 'This request is completed. Reopen it to review items.';
@@ -127,7 +127,7 @@ export function ItemReview({
         </p>
       )}
       {item.status === 'Rejected' && item.rejectionReason && (
-        <p className="text-sm text-red-700">Rejected: {item.rejectionReason}</p>
+        <p className="text-sm text-danger-700">Rejected: {item.rejectionReason}</p>
       )}
 
       {item.files.length > 0 && (

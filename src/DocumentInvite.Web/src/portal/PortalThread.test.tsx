@@ -17,13 +17,13 @@ const list = (items: PortalMessage[]) => jsonResponse(200, { items, total: items
 const URL1 = 'GET /api/portal/messages?page=1&pageSize=10';
 
 describe('PortalThread', () => {
-  it('shows the thread with the lender and you, never a staff name', async () => {
+  it('shows the thread with the requester and you, never a staff name', async () => {
     mockApi({ [URL1]: () => list(thread) });
     renderApp(<PortalThread privacyAccepted onSessionEnded={() => {}} />);
 
     const messages = await screen.findByRole('list', { name: 'Messages, newest first' });
     expect(within(messages).getByText('Please send the lease')).toBeInTheDocument();
-    expect(within(messages).getByText('Your lender')).toBeInTheDocument();
+    expect(within(messages).getByText('Your requester')).toBeInTheDocument();
     expect(within(messages).getByText('You')).toBeInTheDocument();
   });
 
@@ -39,12 +39,12 @@ describe('PortalThread', () => {
     renderApp(<PortalThread privacyAccepted onSessionEnded={() => {}} />);
     const user = userEvent.setup();
 
-    await user.type(await screen.findByLabelText('Message your lender'), 'Hello there');
+    await user.type(await screen.findByLabelText('Message your requester'), 'Hello there');
     await user.click(screen.getByRole('button', { name: 'Send message' }));
 
     await waitFor(() => expect(posted).toBe('Hello there'));
     await waitFor(() => expect(calls.filter((c) => c.key === URL1)).toHaveLength(2));
-    expect(screen.getByLabelText('Message your lender')).toHaveValue('');
+    expect(screen.getByLabelText('Message your requester')).toHaveValue('');
   });
 
   it('asks the party to accept the privacy notice before they can write', async () => {
